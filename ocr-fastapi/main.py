@@ -27,22 +27,29 @@ except Exception:
 
 class LineItem(BaseModel):
     item_name: str
+    item_description: Optional[str] = None
     item_quantity: Optional[float] = None
     item_price: Optional[float] = None
+    item_tax_percentage: Optional[float] = None
     item_total: Optional[float] = None
 
 
 class InvoiceResponse(BaseModel):
-    merchant_name: Optional[str] = None
-    merchant_address: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_gstin: Optional[str] = None
+
     invoice_number: Optional[str] = None
-    transaction_date: Optional[str] = None
+    invoice_date: Optional[str] = None
+
     total_amount: Optional[float] = None
     tax_amount: Optional[float] = None
     discount_amount: Optional[float] = None
-    currency: Optional[str] = None
-    line_items: List[LineItem] = Field(default_factory=list)
+    currency: str = "INR"
 
+    line_items: List[LineItem] = Field(default_factory=list)
 
 gemini_model = None
 
@@ -136,13 +143,16 @@ async def process_single_image(image_path: str) -> Dict[str, Any]:
     try:
         img = Image.open(image_path)
         
-        prompt = '''Extract invoice/receipt data from this image and return ONLY valid JSON with this exact structure:
+        prompt = '''Extract invoice data and return ONLY valid JSON with this exact structure:
 
 {
-  "merchant_name": "string or null",
-  "merchant_address": "string or null",
+  "customer_name": "string or null",
+  "customer_address": "string or null",
+  "customer_phone": "string or null",
+  "customer_email": "string or null",
+  "customer_gstin": "string or null",
   "invoice_number": "string or null",
-  "transaction_date": "string or null",
+  "invoice_date": "string or null",
   "total_amount": number or null,
   "tax_amount": number or null,
   "discount_amount": number or null,
@@ -150,14 +160,19 @@ async def process_single_image(image_path: str) -> Dict[str, Any]:
   "line_items": [
     {
       "item_name": "string",
+      "item_description": "string or null",
       "item_quantity": number or null,
       "item_price": number or null,
+      "item_tax_percentage": number or null,
       "item_total": number or null
     }
   ]
 }
 
-Extract all available information. If a field is not present, use null. Return ONLY the JSON, no markdown formatting, no explanation.'''
+If a field is not present, use null.
+Return ONLY the JSON.
+'''
+
         
         response = gemini_model.generate_content([prompt, img])
         content = response.text
@@ -196,21 +211,32 @@ def merge_invoice_data(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         return results[0]
 
     merged = {
-        "merchant_name": None,
-        "merchant_address": None,
+        "customer_name": None,
+        "customer_address": None,
+        "customer_phone": None,
+        "customer_email": None,
+        "customer_gstin": None,
         "invoice_number": None,
-        "transaction_date": None,
+        "invoice_date": None,
         "total_amount": 0.0,
         "tax_amount": 0.0,
         "discount_amount": 0.0,
-        "currency": None,
+        "currency": "INR",
         "line_items": []
     }
 
     currencies = []
 
     for r in results:
-        for k in ["merchant_name", "merchant_address", "invoice_number", "transaction_date"]:
+        for k in [
+            "customer_name",
+            "customer_address",
+            "customer_phone",
+            "customer_email",
+            "customer_gstin",
+            "invoice_number",
+            "invoice_date"
+        ]:
             if not merged[k] and r.get(k):
                 merged[k] = r[k]
 
@@ -276,7 +302,7 @@ async def process_invoice(
     try:
         if len(files) == 1:
             f = files[0]
-            
+
             with tempfile.NamedTemporaryFile(
                 delete=False,
                 suffix=Path(f.filename).suffix
@@ -288,11 +314,11 @@ async def process_invoice(
                 print(f"Processing PDF: {f.filename}")
                 image_paths = await pdf_to_images(tmp.name)
                 temp_files.extend(image_paths)
-                
+
             elif is_image(f.filename):
                 print(f"Processing image: {f.filename}")
                 image_paths = [tmp.name]
-                
+
             else:
                 raise HTTPException(
                     400,
@@ -301,7 +327,7 @@ async def process_invoice(
 
         else:
             print(f"Processing {len(files)} files")
-            
+
             for f in files:
                 if not is_image(f.filename):
                     raise HTTPException(
@@ -318,7 +344,7 @@ async def process_invoice(
                     image_paths.append(tmp.name)
 
         print(f"Processing {len(image_paths)} image(s) with Gemini...")
-        
+
         results = await asyncio.gather(
             *[process_single_image(p) for p in image_paths]
         )
@@ -333,19 +359,23 @@ async def process_invoice(
 
         print(f"Merging data from {len(results)} result(s)...")
         merged = merge_invoice_data(results)
-        
+
+        # FIX: ensure currency is always a string
+        if not merged.get("currency"):
+            merged["currency"] = "INR"
+
         print("Processing complete")
         return InvoiceResponse(**merged)
 
     except HTTPException:
         raise
-        
+
     except Exception as e:
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(500, f"Processing error: {str(e)}")
-        
+
     finally:
         await cleanup(temp_files)
 
