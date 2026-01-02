@@ -38,6 +38,12 @@ router.post('/:id/approve', authorize('OWNER'), invoiceController.approveInvoice
 // Reject invoice
 router.post('/:id/reject', authorize('OWNER'), invoiceController.rejectInvoice);
 
+// Delete invoice (only PENDING_REVIEW)
+router.delete('/:id', authorize('OWNER', 'STAFF'), invoiceController.deleteInvoice);
+
+// Match customer (search for duplicates)
+router.post('/match-customer', authorize('OWNER', 'STAFF'), invoiceController.matchCustomer);
+
 // Generate PDF
 router.post('/:id/generate-pdf', authorize('OWNER'), invoiceController.generatePdf);
 

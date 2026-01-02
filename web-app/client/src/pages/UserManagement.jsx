@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { userAPI } from '../services/api';
+import { showToast, confirmAction } from '../utils/toast.jsx';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -37,46 +38,50 @@ const UserManagement = () => {
       setShowCreateModal(false);
       setFormData({ name: '', email: '', password: '', role: 'STAFF' });
       loadUsers();
+      showToast.success('User created successfully!');
     } catch (error) {
       console.error('Failed to create user:', error);
-      alert(error.response?.data?.message || 'Failed to create user');
+      showToast.error(error.response?.data?.message || 'Failed to create user');
     }
   };
 
   const handleDeactivate = async (userId) => {
-    if (!confirm('Are you sure you want to deactivate this user?')) return;
-    
-    try {
-      await userAPI.deactivate(userId);
-      loadUsers();
-    } catch (error) {
-      console.error('Failed to deactivate user:', error);
-      alert(error.response?.data?.message || 'Failed to deactivate user');
-    }
+    confirmAction('Are you sure you want to deactivate this user?', async () => {
+      try {
+        await userAPI.deactivate(userId);
+        loadUsers();
+        showToast.success('User deactivated successfully');
+      } catch (error) {
+        console.error('Failed to deactivate user:', error);
+        showToast.error(error.response?.data?.message || 'Failed to deactivate user');
+      }
+    });
   };
 
   const handleReactivate = async (userId) => {
-    if (!confirm('Are you sure you want to reactivate this user?')) return;
-    
-    try {
-      await userAPI.reactivate(userId);
-      loadUsers();
-    } catch (error) {
-      console.error('Failed to reactivate user:', error);
-      alert(error.response?.data?.message || 'Failed to reactivate user');
-    }
+    confirmAction('Are you sure you want to reactivate this user?', async () => {
+      try {
+        await userAPI.reactivate(userId);
+        loadUsers();
+        showToast.success('User reactivated successfully');
+      } catch (error) {
+        console.error('Failed to reactivate user:', error);
+        showToast.error(error.response?.data?.message || 'Failed to reactivate user');
+      }
+    });
   };
 
   const handleDelete = async (userId) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone. Users with invoices cannot be deleted.')) return;
-    
-    try {
-      await userAPI.delete(userId);
-      loadUsers();
-    } catch (error) {
-      console.error('Failed to delete user:', error);
-      alert(error.response?.data?.message || 'Failed to delete user');
-    }
+    confirmAction('Are you sure you want to delete this user? This action cannot be undone.', async () => {
+      try {
+        await userAPI.delete(userId);
+        loadUsers();
+        showToast.success('User deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        showToast.error(error.response?.data?.message || 'Failed to delete user');
+      }
+    });
   };
 
   if (loading) {

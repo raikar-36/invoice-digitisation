@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { invoiceAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { showToast, confirmAction } from '../utils/toast.jsx';
 
 const InvoiceDetail = () => {
   const { id } = useParams();
@@ -38,20 +39,20 @@ const InvoiceDetail = () => {
   };
 
   const handleGeneratePdf = async () => {
-    if (!confirm('Generate PDF for this invoice?')) return;
-    
-    try {
-      setGeneratingPdf(true);
-      const response = await invoiceAPI.generatePdf(id);
-      alert('PDF generated successfully!');
-      // Reload invoice to get updated PDF info
-      await loadInvoice();
-    } catch (error) {
-      console.error('Failed to generate PDF:', error);
-      alert(error.response?.data?.message || 'Failed to generate PDF');
-    } finally {
-      setGeneratingPdf(false);
-    }
+    confirmAction('Generate PDF for this invoice?', async () => {
+      try {
+        setGeneratingPdf(true);
+        const response = await invoiceAPI.generatePdf(id);
+        showToast.success('PDF generated successfully!');
+        // Reload invoice to get updated PDF info
+        await loadInvoice();
+      } catch (error) {
+        console.error('Failed to generate PDF:', error);
+        showToast.error(error.response?.data?.message || 'Failed to generate PDF');
+      } finally {
+        setGeneratingPdf(false);
+      }
+    });
   };
 
   const handleDownloadPdf = async () => {
@@ -71,7 +72,7 @@ const InvoiceDetail = () => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Failed to download PDF:', error);
-      alert('Failed to download PDF');
+      showToast.error('Failed to download PDF');
     }
   };
 

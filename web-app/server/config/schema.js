@@ -4,6 +4,10 @@ const createTables = async () => {
   const pool = getPostgresPool();
   
   try {
+    // Enable pg_trgm extension for fuzzy text matching
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+    console.log('✓ pg_trgm extension enabled');
+
     // Create USERS table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -30,6 +34,17 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    // Create GIN indexes for fuzzy matching on customers
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_customers_name_trgm 
+      ON customers USING gin(name gin_trgm_ops)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_customers_phone_trgm 
+      ON customers USING gin(phone gin_trgm_ops)
+    `);
+    console.log('✓ Customer fuzzy matching indexes created');
 
     // Create PRODUCTS table
     await pool.query(`

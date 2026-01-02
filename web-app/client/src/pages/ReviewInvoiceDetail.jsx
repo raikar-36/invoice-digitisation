@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { invoiceAPI } from '../services/api';
+import { invoiceAPI, customerAPI } from '../services/api';
+import CustomerMatchCard from '../components/CustomerMatchCard';
+import CustomerSuggestions from '../components/CustomerSuggestions';
 
 const ReviewInvoiceDetail = () => {
   const { id } = useParams();
@@ -16,6 +18,14 @@ const ReviewInvoiceDetail = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Customer matching state
+  const [matchedCustomer, setMatchedCustomer] = useState(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState([]);
+  const [matchType, setMatchType] = useState('none');
+  const [customerSelection, setCustomerSelection] = useState('existing'); // 'existing' or 'different'
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -97,9 +107,98 @@ const ReviewInvoiceDetail = () => {
     }
   };
 
+  // Debounced customer search function
+  const searchCustomer = useCallback(async (phone, name) => {
+    if (!phone && (!name || name.trim().length < 3)) {
+      setMatchedCustomer(null);
+      setCustomerSuggestions([]);
+      setMatchType('none');
+      return;
+    }
+
+    try {
+      setSearchingCustomer(true);
+      const response = await customerAPI.matchCustomer({ phone, name });
+      
+      if (response.data.matchType === 'exact') {
+        setMatchedCustomer(response.data.customer);
+        setCustomerSuggestions([]);
+        setMatchType('exact');
+        setCustomerSelection('existing');
+      } else if (response.data.matchType === 'fuzzy') {
+        setMatchedCustomer(null);
+        setCustomerSuggestions(response.data.suggestions);
+        setMatchType('fuzzy');
+      } else {
+        setMatchedCustomer(null);
+        setCustomerSuggestions([]);
+        setMatchType('none');
+      }
+    } catch (err) {
+      console.error('Customer search error:', err);
+    } finally {
+      setSearchingCustomer(false);
+    }
+  }, []);
+
+  // Trigger search when phone or name changes (debounced)
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchCustomer(formData.customer_phone, formData.customer_name);
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [formData.customer_phone, formData.customer_name, searchCustomer]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Reset customer selection when phone changes
+    if (name === 'customer_phone' && matchedCustomer) {
+      setCustomerSelection('existing');
+    }
+  };
+
+  const handleSuggestionSelect = (suggestion) => {
+    setMatchedCustomer(suggestion);
+    setCustomerSuggestions([]);
+    setMatchType('exact');
+    setCustomerSelection('existing');
+    
+    // Auto-fill form with selected customer data
+    setFormData(prev => ({
+      ...prev,
+      customer_name: suggestion.name || '',
+      customer_phone: suggestion.phone || '',
+      customer_email: suggestion.email || '',
+      customer_gstin: suggestion.gstin || '',
+      customer_address: suggestion.address || ''
+    }));
+  };
+
+  const handleCustomerSelectionChange = (selection) => {
+    setCustomerSelection(selection);
+    
+    if (selection === 'existing' && matchedCustomer) {
+      // Auto-fill with matched customer data
+      setFormData(prev => ({
+        ...prev,
+        customer_name: matchedCustomer.name || '',
+        customer_phone: matchedCustomer.phone || '',
+        customer_email: matchedCustomer.email || '',
+        customer_gstin: matchedCustomer.gstin || '',
+        customer_address: matchedCustomer.address || ''
+      }));
+    }
   };
 
   const handleItemChange = (index, field, value) => {
@@ -206,7 +305,10 @@ const ReviewInvoiceDetail = () => {
           tax_percentage: parseFloat(item.tax_percentage) || 0,
           line_total: parseFloat(item.line_total),
           position: idx + 1
-        }))
+        })),
+        // Customer matching flags
+        useExistingCustomer: matchType === 'exact' && customerSelection === 'existing',
+        existingCustomerId: (matchType === 'exact' && customerSelection === 'existing') ? matchedCustomer?.id : null
       };
 
       await invoiceAPI.submit(id, submissionData);
@@ -438,6 +540,44 @@ const ReviewInvoiceDetail = () => {
             {/* Customer Details */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Customer Details</h2>
+              
+              {/* Customer Match Card - Exact Match */}
+              {matchType === 'exact' && matchedCustomer && (
+                <CustomerMatchCard
+                  customer={matchedCustomer}
+                  selectedOption={customerSelection}
+                  onOptionChange={handleCustomerSelectionChange}
+                />
+              )}
+
+              {/* Customer Suggestions - Fuzzy Matches */}
+              {matchType === 'fuzzy' && customerSuggestions.length > 0 && (
+                <CustomerSuggestions
+                  suggestions={customerSuggestions}
+                  onSelect={handleSuggestionSelect}
+                />
+              )}
+
+              {/* Loading Indicator */}
+              {searchingCustomer && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <span className="text-sm text-blue-700">Searching for existing customer...</span>
+                </div>
+              )}
+
+              {/* New Customer Badge */}
+              {matchType === 'none' && !searchingCustomer && formData.customer_phone && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-600 font-semibold">🆕 New Customer</span>
+                    <span className="text-sm text-blue-700">
+                      This will create a new customer record
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -448,7 +588,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleInputChange}
-                    className="input-field"
+                    disabled={matchType === 'exact' && customerSelection === 'existing'}
+                    className={`input-field ${
+                      matchType === 'exact' && customerSelection === 'existing'
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }`}
                     placeholder="ABC Traders"
                   />
                 </div>
@@ -461,7 +606,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleInputChange}
-                    className="input-field"
+                    disabled={matchType === 'exact' && customerSelection === 'existing'}
+                    className={`input-field ${
+                      matchType === 'exact' && customerSelection === 'existing'
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }`}
                     placeholder="+91-9876543210"
                   />
                 </div>
@@ -474,7 +624,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_email"
                     value={formData.customer_email}
                     onChange={handleInputChange}
-                    className="input-field"
+                    disabled={matchType === 'exact' && customerSelection === 'existing'}
+                    className={`input-field ${
+                      matchType === 'exact' && customerSelection === 'existing'
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }`}
                     placeholder="customer@example.com"
                   />
                 </div>
@@ -487,7 +642,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_gstin"
                     value={formData.customer_gstin}
                     onChange={handleInputChange}
-                    className="input-field"
+                    disabled={matchType === 'exact' && customerSelection === 'existing'}
+                    className={`input-field ${
+                      matchType === 'exact' && customerSelection === 'existing'
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }`}
                     placeholder="22AAAAA0000A1Z5"
                   />
                 </div>
@@ -499,7 +659,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_address"
                     value={formData.customer_address}
                     onChange={handleInputChange}
-                    className="input-field"
+                    disabled={matchType === 'exact' && customerSelection === 'existing'}
+                    className={`input-field ${
+                      matchType === 'exact' && customerSelection === 'existing'
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }`}
                     rows="2"
                     placeholder="123 Main St, City, State, ZIP"
                   />

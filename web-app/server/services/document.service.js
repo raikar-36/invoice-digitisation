@@ -132,4 +132,32 @@ exports.getOcrData = async (invoiceId) => {
   }
 };
 
+exports.deleteInvoiceDocuments = async (invoiceId) => {
+  try {
+    const db = getMongoDb();
+    
+    // Delete all documents associated with the invoice
+    const documentsCollection = db.collection('documents');
+    const documentsResult = await documentsCollection.deleteMany({ 
+      invoice_id: invoiceId.toString() 
+    });
+    console.log(`Deleted ${documentsResult.deletedCount} documents for invoice ${invoiceId}`);
+    
+    // Delete all OCR data associated with the invoice
+    const ocrCollection = db.collection('ocr_data');
+    const ocrResult = await ocrCollection.deleteMany({ 
+      invoice_id: invoiceId.toString() 
+    });
+    console.log(`Deleted ${ocrResult.deletedCount} OCR records for invoice ${invoiceId}`);
+    
+    return {
+      documents: documentsResult.deletedCount,
+      ocrData: ocrResult.deletedCount
+    };
+  } catch (error) {
+    console.error('Delete invoice documents error:', error);
+    throw error;
+  }
+};
+
 module.exports = exports;

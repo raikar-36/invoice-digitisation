@@ -63,13 +63,10 @@ exports.processOcr = async (files) => {
 
     return { rawOcr, normalized };
   } catch (error) {
-    console.error('OCR processing error:', error.message);
+    console.error('❌ OCR Service Connection Failed:', error.message);
     
-    // Return empty normalized structure if OCR fails
-    return {
-      rawOcr: { error: error.message },
-      normalized: this.normalizeOcrResponse({})
-    };
+    // Re-throw the error so controller can handle it properly
+    throw new Error(`OCR service connection failed: ${error.message}`);
   }
 };
 

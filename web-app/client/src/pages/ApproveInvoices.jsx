@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoiceAPI } from '../services/api';
+import { showToast, confirmAction } from '../utils/toast.jsx';
 
 const ApproveInvoices = () => {
   const navigate = useNavigate();
@@ -31,26 +32,28 @@ const ApproveInvoices = () => {
   };
 
   const handleApprove = async (invoice) => {
-    if (!confirm(`Approve invoice ${invoice.invoice_number} for ₹${invoice.total_amount?.toLocaleString()}?`)) {
-      return;
-    }
-
-    try {
-      setProcessing(true);
-      setError('');
-      
-      await invoiceAPI.approve(invoice.id, {});
-      
-      // Refresh list
-      await fetchPendingApprovalInvoices();
-      
-      alert('Invoice approved successfully!');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to approve invoice');
-      console.error(err);
-    } finally {
-      setProcessing(false);
-    }
+    confirmAction(
+      `Approve invoice ${invoice.invoice_number} for ₹${invoice.total_amount?.toLocaleString()}?`,
+      async () => {
+        try {
+          setProcessing(true);
+          setError('');
+          
+          await invoiceAPI.approve(invoice.id, {});
+          
+          // Refresh list
+          await fetchPendingApprovalInvoices();
+          
+          showToast.success('Invoice approved successfully!');
+        } catch (err) {
+          setError(err.response?.data?.error || 'Failed to approve invoice');
+          showToast.error(err.response?.data?.error || 'Failed to approve invoice');
+          console.error(err);
+        } finally {
+          setProcessing(false);
+        }
+      }
+    );
   };
 
   const handleRejectClick = (invoice) => {
@@ -61,7 +64,7 @@ const ApproveInvoices = () => {
 
   const handleRejectSubmit = async () => {
     if (!rejectionReason.trim()) {
-      alert('Please provide a reason for rejection');
+      showToast.warning('Please provide a reason for rejection');
       return;
     }
 
@@ -78,9 +81,10 @@ const ApproveInvoices = () => {
       
       setShowRejectModal(false);
       setSelectedInvoice(null);
-      alert('Invoice rejected and returned for review');
+      showToast.success('Invoice rejected and returned for review');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to reject invoice');
+      showToast.error(err.response?.data?.error || 'Failed to reject invoice');
       console.error(err);
     } finally {
       setProcessing(false);

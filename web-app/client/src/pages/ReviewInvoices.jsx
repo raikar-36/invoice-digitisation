@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { invoiceAPI } from '../services/api';
+import { showToast, confirmAction } from '../utils/toast.jsx';
 
 const ReviewInvoices = () => {
   const navigate = useNavigate();
@@ -29,6 +30,25 @@ const ReviewInvoices = () => {
 
   const handleReviewClick = (invoiceId) => {
     navigate(`/dashboard/review/${invoiceId}`);
+  };
+
+  const handleDelete = async (invoiceId, invoiceNumber, e) => {
+    e.stopPropagation();
+    
+    confirmAction(
+      `Delete invoice "${invoiceNumber || 'Untitled'}"? This will remove all associated data and cannot be undone.`,
+      async () => {
+        try {
+          await invoiceAPI.delete(invoiceId);
+          // Refresh the list
+          await fetchPendingReviewInvoices();
+          showToast.success('Invoice deleted successfully');
+        } catch (err) {
+          console.error('Failed to delete invoice:', err);
+          showToast.error(err.response?.data?.message || 'Failed to delete invoice');
+        }
+      }
+    );
   };
 
   if (loading) {
@@ -129,15 +149,24 @@ const ReviewInvoices = () => {
                 </div>
 
                 <div className="ml-6">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleReviewClick(invoice.id);
-                    }}
-                    className="btn-primary"
-                  >
-                    Review Now →
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={(e) => handleDelete(invoice.id, invoice.invoice_number, e)}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                      title="Delete Invoice"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReviewClick(invoice.id);
+                      }}
+                      className="btn-primary"
+                    >
+                      Review Now →
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>

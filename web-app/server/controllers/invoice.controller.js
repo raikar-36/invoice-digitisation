@@ -2,6 +2,8 @@ const { getPostgresPool } = require('../config/database');
 const documentService = require('../services/document.service');
 const ocrService = require('../services/ocr.service');
 const auditService = require('../services/audit.service');
+const { normalizePhone } = require('../utils/phoneNormalizer');
+const { normalizeDate } = require('../utils/dateNormalizer');
 const PDFDocument = require('pdfkit');
 
 // Validation helper
@@ -44,6 +46,43 @@ exports.uploadInvoice = async (req, res) => {
       });
     }
 
+    console.log('\n========== PROCESSING OCR ==========');
+    console.log('Files count:', files.length);
+    console.log('Uploaded by user:', userId);
+
+    // Process OCR first before any database operations
+    let rawOcr, normalized;
+    try {
+      const ocrResult = await ocrService.processOcr(files);
+      
+      // Check if OCR service returned valid result structure
+      if (!ocrResult || typeof ocrResult !== 'object') {
+        throw new Error('OCR service returned invalid response structure');
+      }
+      
+      rawOcr = ocrResult.rawOcr || {};
+      normalized = ocrResult.normalized || {};
+      
+      console.log('✅ OCR Processing Successful');
+      console.log('Extracted Invoice Number:', normalized?.invoice?.invoice_number || 'Not extracted (will be filled manually)');
+      console.log('Extracted Amount:', normalized?.invoice?.total_amount || 'Not extracted (will be filled manually)');
+      console.log('Extracted Date:', normalized?.invoice?.invoice_date || 'Not extracted (will be filled manually)');
+      console.log('Note: Missing fields will be filled during review process');
+    } catch (ocrError) {
+      console.error('❌ OCR Service Failed:', ocrError);
+      console.error('Error message:', ocrError.message);
+      console.error('Error stack:', ocrError.stack);
+      
+      // Stop execution - OCR service failed
+      return res.status(500).json({
+        success: false,
+        message: 'OCR service failed to process the invoice. Please ensure the uploaded files are clear invoice images or PDFs.',
+        error: process.env.NODE_ENV === 'development' ? ocrError.message : undefined
+      });
+    }
+
+    console.log('\n========== STARTING DATABASE TRANSACTIONS ==========');
+
     const pool = getPostgresPool();
 
     // Create invoice record (invoice_date will be updated from OCR)
@@ -51,10 +90,16 @@ exports.uploadInvoice = async (req, res) => {
       `INSERT INTO invoices (invoice_number, invoice_date, total_amount, status, created_by, created_at)
        VALUES ($1, NOW(), $2, $3, $4, NOW())
        RETURNING id`,
-      ['PENDING', 0, 'PENDING_REVIEW', userId]
+      [
+        normalized?.invoice?.invoice_number || 'PENDING',
+        normalized?.invoice?.total_amount || 0,
+        'PENDING_REVIEW',
+        userId
+      ]
     );
 
     const invoiceId = invoiceResult.rows[0].id;
+    console.log('✅ Invoice created with ID:', invoiceId);
 
     // Store files in MongoDB
     const documentPromises = files.map((file, index) => 
@@ -70,9 +115,7 @@ exports.uploadInvoice = async (req, res) => {
     );
 
     await Promise.all(documentPromises);
-
-    // Process OCR
-    const { rawOcr, normalized } = await ocrService.processOcr(files);
+    console.log('✅ Documents stored in MongoDB');
 
     // Store OCR data
     await documentService.storeOcrData({
@@ -80,9 +123,20 @@ exports.uploadInvoice = async (req, res) => {
       rawOcrJson: rawOcr,
       normalizedOcrJson: normalized
     });
+    console.log('✅ OCR data stored');
 
     // Update invoice with OCR extracted data
     if (normalized?.invoice) {
+      // Normalize date to PostgreSQL format (YYYY-MM-DD)
+      const normalizedDate = normalized.invoice.invoice_date 
+        ? normalizeDate(normalized.invoice.invoice_date) 
+        : null;
+
+      console.log('Normalized date:', {
+        original: normalized.invoice.invoice_date,
+        normalized: normalizedDate
+      });
+
       await pool.query(
         `UPDATE invoices 
          SET invoice_number = COALESCE($1, invoice_number),
@@ -91,11 +145,12 @@ exports.uploadInvoice = async (req, res) => {
          WHERE id = $4`,
         [
           normalized.invoice.invoice_number || null,
-          normalized.invoice.invoice_date || null,
+          normalizedDate,
           normalized.invoice.total_amount || null,
           invoiceId
         ]
       );
+      console.log('✅ Invoice updated with OCR data');
     }
 
     // Log audit
@@ -106,8 +161,11 @@ exports.uploadInvoice = async (req, res) => {
       details: { file_count: files.length }
     });
 
+    console.log('========== UPLOAD COMPLETE ==========\n');
+
     res.status(201).json({
       success: true,
+      message: `Invoice uploaded successfully! OCR extracted: ${normalized?.invoice?.invoice_number || 'Unknown'} - ₹${normalized?.invoice?.total_amount?.toLocaleString('en-IN') || '0'}`,
       invoiceId,
       ocrData: normalized
     });
@@ -115,7 +173,7 @@ exports.uploadInvoice = async (req, res) => {
     console.error('Upload invoice error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upload invoice'
+      message: 'Failed to upload invoice. Please try again.'
     });
   }
 };
@@ -486,6 +544,8 @@ exports.submitForApproval = async (req, res) => {
     const invoiceData = submissionData.invoice || submissionData;
     const customerData = submissionData.customer || {};
     const items = submissionData.items || [];
+    const useExistingCustomer = submissionData.useExistingCustomer || false;
+    const existingCustomerId = submissionData.existingCustomerId || null;
 
     // Validate invoice data
     const validationErrors = validateInvoiceData({
@@ -533,6 +593,16 @@ exports.submitForApproval = async (req, res) => {
     }
 
     // Update invoice with submission data
+    // Normalize date to PostgreSQL format
+    const normalizedInvoiceDate = normalizeDate(invoiceData.invoice_date);
+    
+    if (!normalizedInvoiceDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid invoice date format. Please use a valid date.'
+      });
+    }
+
     await pool.query(
       `UPDATE invoices 
        SET status = $1, submitted_by = $2, submitted_at = NOW(),
@@ -543,7 +613,7 @@ exports.submitForApproval = async (req, res) => {
         'PENDING_APPROVAL', 
         userId, 
         invoiceData.invoice_number,
-        invoiceData.invoice_date,
+        normalizedInvoiceDate,
         invoiceData.total_amount,
         invoiceData.tax_amount,
         invoiceData.discount_amount,
@@ -562,7 +632,12 @@ exports.submitForApproval = async (req, res) => {
       normalizedOcrJson: {
         invoice: invoiceData,
         customer: customerData,
-        items: items
+        items: items,
+        // Store customer matching decision
+        customerMatching: {
+          useExisting: useExistingCustomer,
+          existingCustomerId: existingCustomerId
+        }
       }
     });
 
@@ -571,7 +646,10 @@ exports.submitForApproval = async (req, res) => {
       invoiceId: id,
       userId,
       action: 'INVOICE_SUBMITTED',
-      details: {}
+      details: {
+        useExistingCustomer,
+        existingCustomerId
+      }
     });
 
     res.json({
@@ -639,17 +717,36 @@ exports.approveInvoice = async (req, res) => {
     
     try {
       await client.query('BEGIN');
+      console.log('\n========== APPROVAL TRANSACTION STARTED ==========');
+      console.log('Invoice ID:', id);
+      console.log('User ID:', userId);
+      console.log('Customer Data:', JSON.stringify(approvalData.customer, null, 2));
+      console.log('Items Count:', approvalData.items.length);
+
+      // Check if we should use existing customer ID from submission
+      const ocrData = await documentService.getOcrData(id);
+      const useExistingCustomerId = ocrData?.normalized_ocr_json?.customerMatching?.existingCustomerId;
 
       // Find or create customer
       let customerId = null;
-      if (approvalData.customer.phone) {
+      
+      if (useExistingCustomerId) {
+        // Use the customer ID selected during review
+        customerId = useExistingCustomerId;
+        console.log('\n--- Using Existing Customer (from review) ---');
+        console.log('Customer ID:', customerId);
+      } else if (approvalData.customer.phone) {
         const customerResult = await client.query(
           'SELECT id FROM customers WHERE phone = $1',
           [approvalData.customer.phone]
         );
+        console.log('\n--- Customer Lookup ---');
+        console.log('Phone:', approvalData.customer.phone);
+        console.log('Found:', customerResult.rows.length > 0);
 
         if (customerResult.rows.length > 0) {
           customerId = customerResult.rows[0].id;
+          console.log('Existing Customer ID:', customerId);
         } else {
           const newCustomer = await client.query(
             `INSERT INTO customers (name, phone, email, gstin, address)
@@ -664,57 +761,74 @@ exports.approveInvoice = async (req, res) => {
             ]
           );
           customerId = newCustomer.rows[0].id;
+          console.log('New Customer Created - ID:', customerId);
+          console.log('Customer Row:', JSON.stringify(newCustomer.rows[0], null, 2));
         }
       }
 
       // Update invoice status
-      await client.query(
+      const invoiceUpdate = await client.query(
         `UPDATE invoices 
          SET status = $1, customer_id = $2, approved_by = $3, approved_at = NOW()
-         WHERE id = $4`,
+         WHERE id = $4
+         RETURNING id, invoice_number, status`,
         ['APPROVED', customerId, userId, id]
       );
+      console.log('\n--- Invoice Updated ---');
+      console.log('Result:', JSON.stringify(invoiceUpdate.rows[0], null, 2));
 
       // Delete existing invoice items
-      await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [id]);
+      const deleteResult = await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [id]);
+      console.log('\n--- Deleted Old Invoice Items ---');
+      console.log('Rows Deleted:', deleteResult.rowCount);
 
       // Insert line items
+      console.log('\n--- Processing Line Items ---');
       for (let i = 0; i < approvalData.items.length; i++) {
         const item = approvalData.items[i];
+        console.log(`\nItem ${i + 1}:`, JSON.stringify(item, null, 2));
         
         // Find or create product within the same transaction
         let productId = null;
-        if (item.name) {
+        const productName = item.name || item.description; // Use description as fallback
+        
+        if (productName) {
           const productResult = await client.query(
             'SELECT id FROM products WHERE name = $1',
-            [item.name]
+            [productName]
           );
+          console.log(`  Product Lookup (name="${productName}"):`, productResult.rows.length > 0 ? 'FOUND' : 'NOT FOUND');
 
           if (productResult.rows.length > 0) {
             productId = productResult.rows[0].id;
+            console.log('  Using Existing Product ID:', productId);
           } else {
             // Create new product
             const newProduct = await client.query(
               `INSERT INTO products (name, standard_price, created_at)
                VALUES ($1, $2, NOW())
-               RETURNING id`,
-              [item.name, item.unit_price || 0]
+               RETURNING id, name, standard_price, created_at`,
+              [productName, item.unit_price || 0]
             );
             productId = newProduct.rows[0].id;
+            console.log('  ✅ NEW PRODUCT CREATED:', JSON.stringify(newProduct.rows[0], null, 2));
           }
         }
 
         // Insert invoice item
-        await client.query(
+        const invoiceItemResult = await client.query(
           `INSERT INTO invoice_items 
            (invoice_id, product_id, description, quantity, unit_price, tax_percentage, line_total, position)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING id, product_id, description, quantity, unit_price, line_total`,
           [id, productId, item.description || item.name, item.quantity || 0, item.unit_price || 0, 
            item.tax_percentage || 0, item.line_total || 0, i + 1]
         );
+        console.log('  ✅ INVOICE ITEM CREATED:', JSON.stringify(invoiceItemResult.rows[0], null, 2));
       }
 
       await client.query('COMMIT');
+      console.log('\n========== ✅ TRANSACTION COMMITTED ==========\n');
 
       // Log audit
       await auditService.log({
@@ -807,6 +921,99 @@ exports.rejectInvoice = async (req, res) => {
   }
 };
 
+exports.deleteInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const userRole = req.user.role;
+
+    const pool = getPostgresPool();
+
+    // Check invoice status and ownership
+    const invoiceCheck = await pool.query(
+      'SELECT id, status, created_by, invoice_number FROM invoices WHERE id = $1',
+      [id]
+    );
+
+    if (invoiceCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+
+    const invoice = invoiceCheck.rows[0];
+
+    // Only allow deletion of PENDING_REVIEW invoices
+    if (invoice.status !== 'PENDING_REVIEW') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only invoices in PENDING_REVIEW status can be deleted'
+      });
+    }
+
+    // Staff can only delete their own invoices, Owner can delete any
+    if (userRole === 'STAFF' && invoice.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete your own invoices'
+      });
+    }
+
+    console.log('\n========== DELETING INVOICE ==========');
+    console.log('Invoice ID:', id);
+    console.log('Invoice Number:', invoice.invoice_number);
+    console.log('Deleted By User ID:', userId);
+
+    // Delete from MongoDB (documents and OCR data)
+    try {
+      await documentService.deleteInvoiceDocuments(id);
+      console.log('✅ MongoDB documents deleted');
+    } catch (mongoError) {
+      console.error('⚠️ MongoDB deletion error:', mongoError.message);
+      // Continue with SQL deletion even if MongoDB fails
+    }
+
+    // Update audit log to remove invoice reference (preserve audit trail)
+    const auditUpdateResult = await pool.query(
+      'UPDATE audit_log SET invoice_id = NULL WHERE invoice_id = $1',
+      [id]
+    );
+    console.log('✅ Audit log updated, rows affected:', auditUpdateResult.rowCount);
+
+    // Delete from PostgreSQL (invoice record - cascade will handle invoice_items)
+    const deleteResult = await pool.query(
+      'DELETE FROM invoices WHERE id = $1',
+      [id]
+    );
+    console.log('✅ PostgreSQL invoice deleted, rows affected:', deleteResult.rowCount);
+
+    // Log audit
+    await auditService.log({
+      invoiceId: null, // Invoice is deleted, so no invoice_id
+      userId,
+      action: 'INVOICE_DELETED',
+      details: { 
+        deleted_invoice_id: parseInt(id),
+        invoice_number: invoice.invoice_number 
+      }
+    });
+
+    console.log('========== INVOICE DELETION COMPLETE ==========\n');
+
+    res.json({
+      success: true,
+      message: 'Invoice deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete invoice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete invoice'
+    });
+  }
+};
+
 exports.generatePdf = async (req, res) => {
   try {
     const { id } = req.params;
@@ -846,7 +1053,7 @@ exports.generatePdf = async (req, res) => {
     const itemsResult = await pool.query(
       `SELECT ii.*, p.name as product_name
        FROM invoice_items ii
-       JOIN products p ON ii.product_id = p.id
+       LEFT JOIN products p ON ii.product_id = p.id
        WHERE ii.invoice_id = $1
        ORDER BY ii.id`,
       [id]
@@ -1124,3 +1331,99 @@ exports.downloadDocument = async (req, res) => {
     });
   }
 };
+
+exports.matchCustomer = async (req, res) => {
+  try {
+    const { phone, name } = req.body;
+    const pool = getPostgresPool();
+
+    // Validate input
+    if (!phone && !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone or name is required for matching'
+      });
+    }
+
+    let matchType = 'none';
+    let customer = null;
+    let suggestions = [];
+    let confidence = 'none';
+
+    // Step 1: Exact phone match (primary)
+    if (phone) {
+      const normalizedPhone = normalizePhone(phone);
+      
+      if (normalizedPhone) {
+        const exactMatchResult = await pool.query(
+          `SELECT c.*, 
+            COUNT(i.id) as invoice_count,
+            COALESCE(SUM(i.total_amount), 0) as lifetime_value,
+            MAX(i.invoice_date) as last_purchase
+           FROM customers c
+           LEFT JOIN invoices i ON i.customer_id = c.id AND i.status = 'APPROVED'
+           WHERE c.phone = $1
+           GROUP BY c.id`,
+          [normalizedPhone]
+        );
+
+        if (exactMatchResult.rows.length > 0) {
+          customer = exactMatchResult.rows[0];
+          matchType = 'exact';
+          confidence = 'high';
+          
+          return res.json({
+            success: true,
+            matchType,
+            customer,
+            suggestions: [],
+            confidence
+          });
+        }
+      }
+    }
+
+    // Step 2: Fuzzy name match (fallback)
+    if (name && name.trim().length >= 3) {
+      const fuzzyMatchResult = await pool.query(
+        `SELECT c.*, 
+          similarity(c.name, $1) as similarity_score,
+          COUNT(i.id) as invoice_count,
+          COALESCE(SUM(i.total_amount), 0) as lifetime_value,
+          MAX(i.invoice_date) as last_purchase
+         FROM customers c
+         LEFT JOIN invoices i ON i.customer_id = c.id AND i.status = 'APPROVED'
+         WHERE similarity(c.name, $1) > 0.5
+         GROUP BY c.id
+         ORDER BY similarity_score DESC
+         LIMIT 5`,
+        [name.trim()]
+      );
+
+      if (fuzzyMatchResult.rows.length > 0) {
+        suggestions = fuzzyMatchResult.rows.map(row => ({
+          ...row,
+          similarity_score: parseFloat(row.similarity_score).toFixed(2)
+        }));
+        matchType = 'fuzzy';
+        confidence = suggestions[0].similarity_score > 0.7 ? 'medium' : 'low';
+      }
+    }
+
+    res.json({
+      success: true,
+      matchType,
+      customer,
+      suggestions,
+      confidence
+    });
+  } catch (error) {
+    console.error('Match customer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to match customer',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+

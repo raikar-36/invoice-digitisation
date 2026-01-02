@@ -38,6 +38,7 @@ export const invoiceAPI = {
   submit: (id, data) => api.post(`/invoices/${id}/submit`, data),
   approve: (id, data) => api.post(`/invoices/${id}/approve`, data),
   reject: (id, data) => api.post(`/invoices/${id}/reject`, data),
+  delete: (id) => api.delete(`/invoices/${id}`),
   generatePdf: (id) => api.post(`/invoices/${id}/generate-pdf`),
   downloadDocument: (invoiceId, documentId) => 
     api.get(`/invoices/${invoiceId}/documents/${documentId}`, { responseType: 'blob' })
@@ -46,7 +47,8 @@ export const invoiceAPI = {
 // Customer endpoints
 export const customerAPI = {
   getAll: () => api.get('/customers'),
-  getById: (id) => api.get(`/customers/${id}`)
+  getById: (id) => api.get(`/customers/${id}`),
+  matchCustomer: (data) => api.post('/invoices/match-customer', data)
 };
 
 // Product endpoints
