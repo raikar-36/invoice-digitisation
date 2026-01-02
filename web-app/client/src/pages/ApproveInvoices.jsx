@@ -13,6 +13,8 @@ const ApproveInvoices = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchPendingApprovalInvoices();
@@ -95,6 +97,20 @@ const ApproveInvoices = () => {
     navigate(`/dashboard/invoices/${invoiceId}`);
   };
 
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentInvoices = invoices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(invoices.length / itemsPerPage);
+
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  const goToPrevPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -133,8 +149,13 @@ const ApproveInvoices = () => {
           </p>
         </motion.div>
       ) : (
-        <div className="grid gap-6">
-          {invoices.map((invoice, index) => (
+        <>
+          <div className="mb-4 text-sm text-gray-600">
+            Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
+          </div>
+
+          <div className="grid gap-6">
+            {currentInvoices.map((invoice, index) => (
             <motion.div
               key={invoice.id}
               initial={{ opacity: 0, y: 20 }}
@@ -258,6 +279,30 @@ const ApproveInvoices = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 mt-8">
+            <button
+              onClick={goToPrevPage}
+              disabled={currentPage === 1}
+              className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ← Previous
+            </button>
+            <span className="text-gray-700 font-medium">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        )}
+      </>
       )}
 
       {/* Rejection Modal */}

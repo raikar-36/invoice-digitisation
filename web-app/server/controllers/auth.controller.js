@@ -116,3 +116,50 @@ exports.getCurrentUser = async (req, res) => {
     });
   }
 };
+
+exports.verifyPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password is required'
+      });
+    }
+
+    const pool = getPostgresPool();
+    const result = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const user = result.rows[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid password'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password verified successfully'
+    });
+  } catch (error) {
+    console.error('Verify password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Password verification failed'
+    });
+  }
+};

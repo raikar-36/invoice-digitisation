@@ -387,15 +387,38 @@ const ReviewInvoiceDetail = () => {
             
             {documents.length > 0 ? (
               <div>
-                <div className="bg-gray-100 rounded-lg overflow-hidden mb-4">
-                  <img
-                    src={`/api/documents/${documents[currentImageIndex]?.document_id}`}
-                    alt={`Invoice page ${currentImageIndex + 1}`}
-                    className="w-full h-auto"
-                    onError={(e) => {
-                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23999"%3EImage not available%3C/text%3E%3C/svg%3E';
-                    }}
-                  />
+                <div className="bg-gray-100 rounded-lg overflow-hidden mb-4" style={{ minHeight: '400px' }}>
+                  {documents[currentImageIndex]?.content_type === 'application/pdf' ? (
+                    <div className="flex flex-col items-center justify-center p-8 min-h-[400px]">
+                      <svg className="w-32 h-32 text-red-500 mb-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                        <path d="M14 2v6h6"/>
+                        <path d="M9 13h6M9 17h3"/>
+                      </svg>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">PDF Document</h3>
+                      <p className="text-sm text-gray-600 mb-4 text-center">
+                        {documents[currentImageIndex]?.file_name || 'Invoice.pdf'}
+                      </p>
+                      <button
+                        onClick={() => window.open(`/api/documents/${documents[currentImageIndex]?.document_id}`, '_blank')}
+                        className="btn-primary flex items-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Open in New Tab
+                      </button>
+                    </div>
+                  ) : (
+                    <img
+                      src={`/api/documents/${documents[currentImageIndex]?.document_id}`}
+                      alt={`Invoice page ${currentImageIndex + 1}`}
+                      className="w-full h-auto"
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23999"%3EImage not available%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                  )}
                 </div>
 
                 {documents.length > 1 && (
