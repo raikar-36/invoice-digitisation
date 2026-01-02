@@ -353,7 +353,7 @@ const ReviewInvoiceDetail = () => {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Review Invoice</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Review Invoice</h1>
         <p className="text-gray-600 mt-2">
           Verify and correct the data extracted by OCR
         </p>
@@ -395,7 +395,7 @@ const ReviewInvoiceDetail = () => {
                         <path d="M14 2v6h6"/>
                         <path d="M9 13h6M9 17h3"/>
                       </svg>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">PDF Document</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">PDF Document</h3>
                       <p className="text-sm text-gray-600 mb-4 text-center">
                         {documents[currentImageIndex]?.file_name || 'Invoice.pdf'}
                       </p>
@@ -473,10 +473,10 @@ const ReviewInvoiceDetail = () => {
           <div className="card">
             {/* Invoice Details */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Invoice Details</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Invoice Details</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Invoice Number <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -489,7 +489,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Invoice Date <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -501,7 +501,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Total Amount <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -515,7 +515,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Tax Amount
                   </label>
                   <input
@@ -529,7 +529,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Discount Amount
                   </label>
                   <input
@@ -543,14 +543,14 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Currency
                   </label>
                   <select
                     name="currency"
                     value={formData.currency}
                     onChange={handleInputChange}
-                    className="input-field"
+                    className="select-field"
                   >
                     <option value="INR">INR (₹)</option>
                     <option value="USD">USD ($)</option>
@@ -562,7 +562,7 @@ const ReviewInvoiceDetail = () => {
 
             {/* Customer Details */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Customer Details</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Customer Details</h2>
               
               {/* Customer Match Card - Exact Match */}
               {matchType === 'exact' && matchedCustomer && (
@@ -603,7 +603,7 @@ const ReviewInvoiceDetail = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Customer Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -621,7 +621,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Phone <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -639,7 +639,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Email
                   </label>
                   <input
@@ -657,7 +657,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     GSTIN
                   </label>
                   <input
@@ -675,7 +675,7 @@ const ReviewInvoiceDetail = () => {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Address
                   </label>
                   <textarea
@@ -726,7 +726,7 @@ const ReviewInvoiceDetail = () => {
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Description
                           </label>
                           <input
@@ -738,7 +738,7 @@ const ReviewInvoiceDetail = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Quantity
                           </label>
                           <input
@@ -751,7 +751,7 @@ const ReviewInvoiceDetail = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Unit Price
                           </label>
                           <input
@@ -764,7 +764,7 @@ const ReviewInvoiceDetail = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Tax %
                           </label>
                           <input
@@ -777,7 +777,7 @@ const ReviewInvoiceDetail = () => {
                           />
                         </div>
                         <div className="col-span-2 md:col-span-5">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Line Total: <span className="text-indigo-600">₹{item.line_total || '0.00'}</span>
                           </label>
                         </div>

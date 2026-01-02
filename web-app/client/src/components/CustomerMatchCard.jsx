@@ -37,25 +37,25 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
       <div className="bg-white rounded-lg p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <span className="text-xs text-gray-500 uppercase">Name</span>
-            <p className="font-semibold text-gray-900">{customer.name || 'N/A'}</p>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">Name</span>
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{customer.name || 'N/A'}</p>
           </div>
           <div>
-            <span className="text-xs text-gray-500 uppercase">Phone</span>
-            <p className="font-semibold text-gray-900">{customer.phone || 'N/A'}</p>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">Phone</span>
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{customer.phone || 'N/A'}</p>
           </div>
           <div>
-            <span className="text-xs text-gray-500 uppercase">Email</span>
-            <p className="font-semibold text-gray-900">{customer.email || 'Not provided'}</p>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">Email</span>
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{customer.email || 'Not provided'}</p>
           </div>
           <div>
-            <span className="text-xs text-gray-500 uppercase">GSTIN</span>
-            <p className="font-semibold text-gray-900">{customer.gstin || 'Not provided'}</p>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">GSTIN</span>
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{customer.gstin || 'Not provided'}</p>
           </div>
           {customer.address && (
             <div className="md:col-span-2">
-              <span className="text-xs text-gray-500 uppercase">Address</span>
-              <p className="font-semibold text-gray-900">{customer.address}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400 uppercase">Address</span>
+              <p className="font-semibold text-gray-900 dark:text-gray-100">{customer.address}</p>
             </div>
           )}
         </div>
@@ -97,14 +97,14 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
             className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
           />
           <div className="flex-1">
-            <div className="font-semibold text-gray-900">Use this existing customer</div>
-            <div className="text-sm text-gray-600">
+            <div className="font-semibold text-gray-900 dark:text-gray-100">Use this existing customer</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Link this invoice to the customer record shown above
             </div>
           </div>
         </label>
 
-        <label className="flex items-start gap-3 p-3 bg-white rounded-lg border-2 border-gray-200 cursor-pointer hover:border-yellow-500 transition-colors">
+        <label className="flex items-start gap-3 p-3 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 cursor-pointer hover:border-yellow-500 transition-colors">
           <input
             type="radio"
             name="customerSelection"
@@ -114,8 +114,8 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
             className="mt-1 w-4 h-4 text-yellow-600 focus:ring-yellow-500"
           />
           <div className="flex-1">
-            <div className="font-semibold text-gray-900">This is a different customer</div>
-            <div className="text-sm text-gray-600">
+            <div className="font-semibold text-gray-900 dark:text-gray-100">This is a different customer</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Create a new customer record despite matching phone number
             </div>
           </div>

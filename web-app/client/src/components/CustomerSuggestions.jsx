@@ -27,17 +27,17 @@ const CustomerSuggestions = ({ suggestions, onSelect }) => {
           <div
             key={suggestion.id}
             onClick={() => onSelect(suggestion)}
-            className="bg-white rounded-lg p-4 border-2 border-gray-200 hover:border-yellow-500 cursor-pointer transition-all hover:shadow-md"
+            className="bg-white dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700 hover:border-yellow-500 cursor-pointer transition-all hover:shadow-md"
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-bold text-gray-900">{suggestion.name}</h4>
-                  <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded">
+                  <h4 className="font-bold text-gray-900 dark:text-gray-100">{suggestion.name}</h4>
+                  <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs font-semibold rounded">
                     {formatSimilarity(suggestion.similarity_score)}
                   </span>
                 </div>
-                <div className="text-sm text-gray-600 space-y-1">
+                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                   <div>
                     <span className="font-medium">Phone:</span> {suggestion.phone || 'Not provided'}
                   </div>
@@ -62,15 +62,15 @@ const CustomerSuggestions = ({ suggestions, onSelect }) => {
 
             {/* Purchase Stats */}
             {(suggestion.invoice_count > 0 || suggestion.lifetime_value > 0) && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex gap-4 text-xs">
                   <div>
-                    <span className="text-gray-500">Invoices: </span>
-                    <span className="font-semibold text-gray-900">{suggestion.invoice_count || 0}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Invoices: </span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{suggestion.invoice_count || 0}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Total Value: </span>
-                    <span className="font-semibold text-gray-900">
+                    <span className="text-gray-500 dark:text-gray-400">Total Value: </span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
                       {new Intl.NumberFormat('en-IN', {
                         style: 'currency',
                         currency: 'INR',
@@ -80,8 +80,8 @@ const CustomerSuggestions = ({ suggestions, onSelect }) => {
                   </div>
                   {suggestion.last_purchase && (
                     <div>
-                      <span className="text-gray-500">Last Purchase: </span>
-                      <span className="font-semibold text-gray-900">
+                      <span className="text-gray-500 dark:text-gray-400">Last Purchase: </span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
                         {new Date(suggestion.last_purchase).toLocaleDateString('en-IN', {
                           year: 'numeric',
                           month: 'short',

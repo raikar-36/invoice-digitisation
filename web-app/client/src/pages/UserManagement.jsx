@@ -95,7 +95,7 @@ const UserManagement = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">User Management</h1>
         <button onClick={() => setShowCreateModal(true)} className="btn-primary">
           + Create User
         </button>
@@ -170,7 +170,7 @@ const UserManagement = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-xl p-8 w-full max-w-md"
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New User</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Create New User</h2>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
@@ -207,7 +207,7 @@ const UserManagement = () => {
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="input-field"
+                  className="select-field"
                 >
                   <option value="STAFF">Staff</option>
                   <option value="ACCOUNTANT">Accountant</option>

@@ -137,7 +137,7 @@ const AuditLog = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Audit Log</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Audit Log</h1>
         <p className="text-gray-600 mt-2">
           Complete system audit trail of all user actions and invoice lifecycle events
         </p>
@@ -161,7 +161,7 @@ const AuditLog = () => {
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
-              className="input-field"
+              className="select-field"
             >
               <option value="">All Users</option>
               {users.map(user => (
@@ -179,7 +179,7 @@ const AuditLog = () => {
             <select
               value={selectedAction}
               onChange={(e) => setSelectedAction(e.target.value)}
-              className="input-field"
+              className="select-field"
             >
               <option value="">All Actions</option>
               {actionTypes.map(action => (

@@ -87,7 +87,7 @@ const InvoiceDetail = () => {
   if (!invoice) {
     return (
       <div className="card text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-900">Invoice not found</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Invoice not found</h2>
       </div>
     );
   }
@@ -99,7 +99,7 @@ const InvoiceDetail = () => {
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Invoice {invoice.invoice_number}
           </h1>
           <div className="flex gap-3">

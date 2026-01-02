@@ -66,12 +66,12 @@ const PasswordConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) =>
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {title || 'Confirm Password'}
               </h2>
             </div>
 
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               {message || 'Please enter your password to continue with this action.'}
             </p>
 

@@ -86,7 +86,7 @@ const UploadInvoice = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Upload Invoice</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Upload Invoice</h1>
 
       <div className="card">
         <div
@@ -159,7 +159,7 @@ const UploadInvoice = () => {
                       {file.type.startsWith('image') ? '🖼️' : '📄'}
                     </span>
                     <div>
-                      <p className="font-medium text-gray-900">{file.name}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
                       <p className="text-sm text-gray-500">
                         {(file.size / 1024).toFixed(2)} KB
                       </p>

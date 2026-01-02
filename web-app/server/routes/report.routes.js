@@ -5,6 +5,9 @@ const { authenticate } = require('../middleware/auth.middleware');
 
 router.use(authenticate);
 
+// Comprehensive analytics endpoint
+router.get('/analytics', reportController.getAnalytics);
+
 // Dashboard metrics
 router.get('/dashboard', reportController.getDashboardMetrics);
 

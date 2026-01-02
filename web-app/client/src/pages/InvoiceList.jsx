@@ -123,7 +123,7 @@ const handleDeleteClick = (e, invoice) => {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Invoices</h1>
       </div>
 
       {/* Filters */}
@@ -140,7 +140,7 @@ const handleDeleteClick = (e, invoice) => {
           <select
             value={filters.status}
             onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="input-field"
+            className="select-field"
           >
             <option value="">All Statuses</option>
             <option value="PENDING_REVIEW">Pending Review</option>
@@ -171,12 +171,12 @@ const handleDeleteClick = (e, invoice) => {
       {invoices.length === 0 ? (
         <div className="card text-center py-12">
           <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No invoices found</h3>
-          <p className="text-gray-600">Try adjusting your filters or upload a new invoice</p>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No invoices found</h3>
+          <p className="text-gray-600 dark:text-gray-400">Try adjusting your filters or upload a new invoice</p>
         </div>
       ) : (
         <>
-          <div className="mb-4 text-sm text-gray-600">
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
             Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
           </div>
 
@@ -192,10 +192,10 @@ const handleDeleteClick = (e, invoice) => {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                         {invoice.invoice_number}
                       </h3>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
                         {new Date(invoice.invoice_date).toLocaleDateString()}
                       </p>
                     </div>
@@ -205,20 +205,20 @@ const handleDeleteClick = (e, invoice) => {
                   <div className="space-y-2 mb-4">
                     {invoice.customer_name && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="text-gray-500">👤</span>
-                        <span className="text-gray-700">{invoice.customer_name}</span>
+                        <span className="text-gray-500 dark:text-gray-400">👤</span>
+                        <span className="text-gray-700 dark:text-gray-300">{invoice.customer_name}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-gray-500">💰</span>
-                      <span className="text-gray-900 font-semibold">
+                      <span className="text-gray-900 dark:text-gray-100 font-semibold">
                         ₹{parseFloat(invoice.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
-                    <div className="text-xs text-gray-500">
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       Created by {invoice.created_by_name} on{' '}
                       {new Date(invoice.created_at).toLocaleDateString()}
                     </div>

@@ -72,7 +72,7 @@ const ReviewInvoices = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-xl text-gray-600">Loading invoices...</div>
+        <div className="text-xl text-gray-600 dark:text-gray-400">Loading invoices...</div>
       </div>
     );
   }
@@ -81,7 +81,7 @@ const ReviewInvoices = () => {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Review Queue</h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
           Review and correct invoice data extracted by OCR before submitting for approval
         </p>
       </div>
@@ -102,13 +102,13 @@ const ReviewInvoices = () => {
           <h3 className="text-xl font-semibold text-gray-700 mb-2">
             No Invoices to Review
           </h3>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             All uploaded invoices have been reviewed. Check the Invoices page to upload new ones.
           </p>
         </motion.div>
       ) : (
         <>
-          <div className="mb-4 text-sm text-gray-600">
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
             Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
           </div>
 
@@ -125,7 +125,7 @@ const ReviewInvoices = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-4 mb-3">
-                      <h3 className="text-xl font-semibold text-gray-900">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                         {invoice.invoice_number || 'Not extracted'}
                       </h3>
                       <span className="status-badge status-pending-review">
@@ -135,28 +135,28 @@ const ReviewInvoices = () => {
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-500">Invoice Date:</span>
-                        <p className="font-medium text-gray-900">
+                        <span className="text-gray-500 dark:text-gray-400">Invoice Date:</span>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           {invoice.invoice_date 
                             ? new Date(invoice.invoice_date).toLocaleDateString()
                             : 'Not set'}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Amount:</span>
-                        <p className="font-medium text-gray-900">
+                        <span className="text-gray-500 dark:text-gray-400">Amount:</span>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           ₹{invoice.total_amount?.toLocaleString() || '0.00'}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Uploaded:</span>
-                        <p className="font-medium text-gray-900">
+                        <span className="text-gray-500 dark:text-gray-400">Uploaded:</span>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           {new Date(invoice.created_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Documents:</span>
-                        <p className="font-medium text-gray-900">
+                        <span className="text-gray-500 dark:text-gray-400">Documents:</span>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           {invoice.document_count || 0} file(s)
                         </p>
                       </div>
@@ -219,7 +219,7 @@ const ReviewInvoices = () => {
             </div>
           )}
 
-          <div className="mt-6 text-sm text-gray-600">
+          <div className="mt-6 text-sm text-gray-600 dark:text-gray-400">
             <p><strong>Tip:</strong> Click on any invoice to review and correct the OCR-extracted data.</p>
           </div>
         </>

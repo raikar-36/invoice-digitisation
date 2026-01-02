@@ -944,20 +944,21 @@ exports.deleteInvoice = async (req, res) => {
 
     const invoice = invoiceCheck.rows[0];
 
-    // Only allow deletion of PENDING_REVIEW invoices
-    if (invoice.status !== 'PENDING_REVIEW') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only invoices in PENDING_REVIEW status can be deleted'
-      });
-    }
-
-    // Staff can only delete their own invoices, Owner can delete any
-    if (userRole === 'STAFF' && invoice.created_by !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only delete your own invoices'
-      });
+    // OWNER can delete any invoice regardless of status
+    // STAFF can only delete their own PENDING_REVIEW invoices
+    if (userRole === 'STAFF') {
+      if (invoice.created_by !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only delete your own invoices'
+        });
+      }
+      if (invoice.status !== 'PENDING_REVIEW') {
+        return res.status(400).json({
+          success: false,
+          message: 'You can only delete invoices in PENDING_REVIEW status'
+        });
+      }
     }
 
     console.log('\n========== DELETING INVOICE ==========');
