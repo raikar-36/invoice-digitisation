@@ -1,6 +1,28 @@
 # Smart Invoice System - Setup Guide
 
-## Quick Start Guide (Windows)
+## Automated Setup (Recommended)
+
+### Windows
+```powershell
+.\start.ps1
+```
+
+### Linux/macOS
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+The automated script will:
+- Check prerequisites (Node.js, npm)
+- Create .env from template
+- Install dependencies
+- Optionally seed database
+- Start development servers
+
+---
+
+## Manual Setup Guide (Windows)
 
 ### Step 1: Verify Prerequisites
 ```powershell
@@ -48,7 +70,7 @@ Copy-Item .env.example .env
 MONGODB_URI=mongodb+srv://YOUR_USER:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/invoice_system
 POSTGRES_URI=postgresql://YOUR_USER:YOUR_PASSWORD@YOUR_HOST.neon.tech/invoice_db?sslmode=require
 JWT_SECRET=change-this-to-a-random-secret-key
-OCR_SERVICE_URL=http://localhost:8000/ocr/process
+OCR_SERVICE_URL=http://localhost:8000/api/v1/process-invoice
 ```
 
 ### Step 4: Seed Database

@@ -6,6 +6,12 @@
 │ 🚀 INSTANT SETUP (3 STEPS)                                   │
 └──────────────────────────────────────────────────────────────┘
 
+   AUTOMATED (Easiest):
+   Windows:     .\start.ps1
+   Linux/macOS: chmod +x start.sh && ./start.sh
+
+   MANUAL:
+
 1. Install dependencies:
    npm install && cd client && npm install && cd ..
 
@@ -80,15 +86,18 @@
                       Stored in MongoDB
 
 ┌──────────────────────────────────────────────────────────────┐
-│ 🌐 API ENDPOINTS (28 TOTAL)                                  │
+│ 🌐 API ENDPOINTS (35 TOTAL)                                  │
 └──────────────────────────────────────────────────────────────┘
 
-   Auth (3):         /api/auth/login, /logout, /me
-   Users (4):        /api/users
-   Invoices (9):     /api/invoices
+   Auth (4):         /api/auth/login, /logout, /me, /verify-password
+   Users (6):        /api/users (list, create, deactivate, reactivate, role, delete)
+   Invoices (11):    /api/invoices (upload, list, detail, update, submit, approve,
+                     reject, generate-pdf, documents, ocr, delete, match-customer)
+   Documents (1):    /api/documents/:documentId
    Customers (2):    /api/customers
    Products (2):     /api/products
-   Reports (6):      /api/reports
+   Reports (7):      /api/reports (analytics, dashboard, revenue-flow, top-customers,
+                     product-performance, weekly-pattern, status-distribution)
    Audit (2):        /api/audit
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -187,8 +196,6 @@
    SETUP.md               Step-by-step setup guide
    API_TESTING.md         API endpoint examples
    TROUBLESHOOTING.md     Common issues & solutions
-   PROJECT_SUMMARY.md     Implementation overview
-   FEATURES.md            Feature checklist
    QUICKSTART.txt         This file!
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -212,11 +219,11 @@
 
    Files:         50+
    Code:          5,000+ lines
-   Endpoints:     28 APIs
+   Endpoints:     35 APIs
    DB Tables:     6 (PostgreSQL)
    Collections:   2 (MongoDB)
-   Pages:         9 frontend routes
-   Completion:    95%
+   Pages:         10 frontend routes
+   Completion:    98% (PDF render stub)
 
 ┌──────────────────────────────────────────────────────────────┐
 │ 💡 TIPS                                                      │

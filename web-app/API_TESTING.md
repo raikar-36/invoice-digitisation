@@ -357,11 +357,58 @@ curl -X POST http://localhost:5000/api/invoices/1/generate-pdf \
 
 ### 16. Download Document
 ```bash
-curl http://localhost:5000/api/invoices/1/documents/uuid-here \
+curl http://localhost:5000/api/documents/uuid-here \
   -b cookies.txt \
   --output invoice.pdf
 
 # Downloads the file
+```
+
+### Invoice Helper Endpoints (documents + OCR)
+
+List all documents for an invoice
+```bash
+curl http://localhost:5000/api/invoices/1/documents \
+  -b cookies.txt
+
+# Response:
+{
+  "success": true,
+  "documents": [
+    {
+      "document_id": "uuid-here",
+      "file_name": "invoice1.jpg",
+      "content_type": "image/jpeg",
+      "position": 1
+    }
+  ]
+}
+```
+
+Fetch OCR data for an invoice
+```bash
+curl http://localhost:5000/api/invoices/1/ocr \
+  -b cookies.txt
+
+# Response:
+{
+  "success": true,
+  "ocr": {
+    "raw": { ... },
+    "normalized": {
+      "invoice": { "invoice_number": "INV-123", "invoice_date": "2026-01-15" },
+      "customer": { "name": "ABC Traders" },
+      "items": []
+    }
+  }
+}
+```
+
+Serve a single document by ID (binary response)
+```bash
+curl http://localhost:5000/api/documents/uuid-here \
+  -b cookies.txt \
+  --output invoice-file
 ```
 
 ## Customers
@@ -701,4 +748,14 @@ curl http://localhost:5000/api/invoices -b cookies.txt
 
 ---
 
-**Total Endpoints: 28 main endpoints + variations**
+**Total Endpoints: 35 documented API endpoints**
+
+Breakdown:
+- Auth: 4 (login, logout, me, verify-password)
+- Users: 6 (list, create, deactivate, reactivate, role, delete)
+- Invoices: 11 (upload, list, detail, update, submit, approve, reject, generate-pdf, documents, ocr, delete, match-customer)
+- Documents: 1 (serve by ID)
+- Customers: 2 (list, detail)
+- Products: 2 (list, detail)
+- Reports: 7 (analytics, dashboard, revenue-flow, top-customers, product-performance, weekly-pattern, status-distribution)
+- Audit: 2 (all, invoice-specific)

@@ -10,339 +10,174 @@ A full-stack web application that digitizes paper invoices using OCR, enforces m
 - **Review Workflow**: Manual review and correction of OCR-extracted data
 - **Approval System**: Owner-only approval with customer/product matching
 - **Document Storage**: Secure MongoDB storage for original and generated PDFs
-- **Structured Data**: PostgreSQL for validated business data
-- **Audit Trail**: Complete logging of all actions and state changes
+# Smart Invoice Digitization and Management System
 
-### User Roles
-- **Owner (Admin)**: Full system access including approval and user management
-- **Staff**: Upload, review, and submit invoices for approval
-- **Accountant**: View-only access to approved invoices and reports
+Full-stack invoice digitization, review, approval, storage, analytics, and audit trail. Latest updates include the fully built review/approval queues, audit log viewer, and secure document serving.
 
-### Analytics & Reporting
-- Business pulse dashboard with key metrics
-- Revenue flow visualization
-- Top customers leaderboard
-- Product performance analytics
-- Weekly pattern analysis
+## Features
 
-## 🛠️ Tech Stack
+- **End-to-end workflow**: Upload (multi-image/PDF) → OCR → Review → Submit → Approve/Reject → PDF stub → Reports/Audit.
+- **Data + files**: PostgreSQL for structured data, MongoDB for documents and OCR payloads.
+- **Role-aware UI**: Owner (admin), Staff (ops), Accountant (viewer) with route guarding and API enforcement.
+- **Reporting**: Revenue flow, top customers, product performance, weekly patterns, status distribution.
+- **Auditability**: Every action logged with user context; audit log viewer with filtering and pagination.
+- **Polished UX**: Drag-drop uploads, animated UI (Framer Motion), responsive layouts, multi-image carousel in review detail.
 
-### Backend
-- Node.js + Express
-- PostgreSQL (NeonDB) - Structured data
-- MongoDB Atlas - Document storage
-- JWT Authentication with httpOnly cookies
-- Multer for file uploads
-- Axios for OCR service integration
+## Tech Stack
 
-### Frontend
-- React 18
-- React Router v6
-- Tailwind CSS
-- Framer Motion (animations)
-- Recharts (data visualization)
-- Axios (API calls)
+- **Backend**: Node.js, Express, PostgreSQL (Neon), MongoDB Atlas, JWT + httpOnly cookies, Multer uploads, Axios for OCR.
+- **Frontend**: React 18, React Router v6, Tailwind CSS, Framer Motion, Recharts, Axios.
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Node.js 18+ and npm
-- PostgreSQL database (NeonDB recommended)
-- MongoDB Atlas account
-- External OCR service (Python) running separately
+- PostgreSQL database (Neon recommended)
+- MongoDB Atlas cluster
+- Optional external OCR service (Python) reachable via HTTP
 
-## 🚀 Installation
+## Setup
 
-### 1. Clone the repository
-```bash
-cd copilot
-```
+**Quick Start (Automated):**
+- Windows: Run `./start.ps1` in PowerShell
+- Linux/macOS: Run `chmod +x start.sh && ./start.sh`
 
-### 2. Install backend dependencies
+**Manual Setup:**
+
+1) Install dependencies
 ```bash
 npm install
+cd client && npm install && cd ..
 ```
 
-### 3. Install frontend dependencies
-```bash
-cd client
-npm install
-cd ..
-```
-
-### 4. Configure environment variables
-
-Create `.env` file in the root directory:
-
+2) Configure environment
 ```env
-# Server Configuration
+# Server
 PORT=5000
 NODE_ENV=development
 
-# Database Configuration
+# Databases
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/invoice_system?retryWrites=true&w=majority
 POSTGRES_URI=postgresql://username:password@host.region.neon.tech/invoice_db?sslmode=require
 
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+# Auth
+JWT_SECRET=your-super-secret-jwt-key
 JWT_EXPIRES_IN=7d
 
-# OCR Service Configuration
-OCR_SERVICE_URL=http://localhost:8000/ocr/process
-OCR_TIMEOUT=30000
+# OCR (optional - system works without it)
+OCR_SERVICE_URL=http://localhost:8000/api/v1/process-invoice
+OCR_TIMEOUT=100000
 
-# File Upload Configuration
+# Uploads
 MAX_FILE_SIZE=10485760
 ```
 
-### 5. Seed the database
-
+3) Seed databases
 ```bash
 node server/seed.js
 ```
+Creates tables and demo users:
+- Owner: owner@invoice.com / admin123
+- Staff: staff@invoice.com / staff123
+- Accountant: accountant@invoice.com / accountant123
 
-This creates:
-- Database tables (PostgreSQL)
-- Initial users:
-  - **Owner**: owner@invoice.com / admin123
-  - **Staff**: staff@invoice.com / staff123
-  - **Accountant**: accountant@invoice.com / accountant123
+4) Run
+- Both servers: `npm run dev`
+- Backend only: `npm run server`
+- Frontend only: `npm run client`
 
-### 6. Start the development servers
+Frontend: http://localhost:5173 • API: http://localhost:5000
 
-**Option 1: Run both servers together**
-```bash
-npm run dev
-```
-
-**Option 2: Run separately**
-
-Terminal 1 (Backend):
-```bash
-npm run server
-```
-
-Terminal 2 (Frontend):
-```bash
-npm run client
-```
-
-### 7. Access the application
-
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5000
-
-## 📊 Database Schema
-
-### PostgreSQL Tables
-- `users` - User accounts and roles
-- `customers` - Customer information
-- `products` - Product catalog
-- `invoices` - Invoice header data
-- `invoice_items` - Invoice line items
-- `audit_log` - System audit trail
-
-### MongoDB Collections
-- `documents` - Binary file storage (images, PDFs)
-- `ocr_data` - Raw and normalized OCR responses
-
-## 🔄 Invoice Lifecycle
+## Invoice Lifecycle
 
 ```
-1. UPLOAD → PENDING_REVIEW
-   - Staff/Owner uploads invoice images
-   - Files stored in MongoDB
-   - OCR processing initiated
+Upload → PENDING_REVIEW
+  • Multi-image upload stored in MongoDB
+  • OCR kicks in (if configured)
 
-2. REVIEW → PENDING_REVIEW
-   - User reviews and corrects OCR data
-   - Edit any fields as needed
+Review → PENDING_REVIEW
+  • Rich review form with OCR prefill, multi-image carousel
+  • Save draft or submit
 
-3. SUBMIT → PENDING_APPROVAL
-   - Validation checks performed
-   - Status changes to PENDING_APPROVAL
+Submit → PENDING_APPROVAL
+  • Validation and audit logging
 
-4. APPROVE → APPROVED
-   - Owner reviews and approves
-   - Customer/Product matching
-   - Data saved to PostgreSQL
-   
-   OR
-   
-   REJECT → PENDING_REVIEW
-   - Owner rejects with reason
-   - Returns to review stage
+Approve/Reject → APPROVED or back to PENDING_REVIEW
+  • Customer/Product matching and SQL writes
+  • Rejection requires reason
 
-5. GENERATE PDF (Optional)
-   - Owner generates formatted PDF
-   - PDF stored in MongoDB
+Generate PDF (stub)
+  • Placeholder PDF stored in MongoDB
 ```
 
-## 🎨 UI Design Philosophy
+## API Surface (35 endpoints)
 
-The system emphasizes **transformation from analog to digital**:
+- **Auth (4)**: POST /api/auth/login, POST /api/auth/logout, GET /api/auth/me, POST /api/auth/verify-password
+- **Invoices (11)**: POST /api/invoices/upload, GET /api/invoices, GET /api/invoices/:id, PUT /api/invoices/:id, POST /api/invoices/:id/submit, POST /api/invoices/:id/approve, POST /api/invoices/:id/reject, POST /api/invoices/:id/generate-pdf, GET /api/invoices/:id/documents, GET /api/invoices/:id/ocr, DELETE /api/invoices/:id, POST /api/invoices/match-customer
+- **Documents (1)**: GET /api/documents/:documentId
+- **Users (6)**: GET /api/users, POST /api/users, PATCH /api/users/:id/deactivate, PATCH /api/users/:id/reactivate, PATCH /api/users/:id/role, DELETE /api/users/:id
+- **Customers (2)**: GET /api/customers, GET /api/customers/:id
+- **Products (2)**: GET /api/products, GET /api/products/:id
+- **Reports (7)**: GET /api/reports/analytics, GET /api/reports/dashboard, GET /api/reports/revenue-flow, GET /api/reports/top-customers, GET /api/reports/product-performance, GET /api/reports/weekly-pattern, GET /api/reports/status-distribution
+- **Audit (2)**: GET /api/audit, GET /api/audit/invoice/:id
 
-- Progressive color system (amber → indigo → green)
-- Tactile upload experience with drag-and-drop
-- Smooth animations with Framer Motion
-- Accessible design (WCAG compliant)
-- Responsive layouts for all screen sizes
+## Testing the App
 
-## 🔐 Security Features
+- **Owner**: Upload → Review → Submit → Approve/Reject; generate PDF stub; verify audit log entries and reports update.
+- **Staff**: Upload → Review → Submit; ensure no approval buttons.
+- **Accountant**: Confirm view-only access to approved invoices and all reports.
+- **Documents**: Download via GET /api/documents/:documentId from an invoice.
 
-- JWT tokens in httpOnly cookies (XSS protection)
-- Role-based access control
-- Password hashing with bcrypt
-- SQL injection prevention (parameterized queries)
-- File type and size validation
-- Environment-based configuration
+## Known Limitations
 
-## 📡 API Endpoints
+- PDF generation uses a placeholder; integrate a renderer (e.g., pdfkit) for production PDFs.
+- OCR service must be provided externally; system works with manual entry when unavailable.
+- No real-time notifications or CSV/Excel export yet.
 
-### Authentication
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `GET /api/auth/me` - Get current user
+## Next Improvements
 
-### Invoices
-- `POST /api/invoices/upload` - Upload invoice
-- `GET /api/invoices` - List invoices (with filters)
-- `GET /api/invoices/:id` - Get invoice details
-- `PUT /api/invoices/:id` - Update invoice
-- `POST /api/invoices/:id/submit` - Submit for approval
-- `POST /api/invoices/:id/approve` - Approve invoice (Owner)
-- `POST /api/invoices/:id/reject` - Reject invoice (Owner)
-- `POST /api/invoices/:id/generate-pdf` - Generate PDF (Owner)
+- Wire real PDF rendering
+- Add exports and bulk ops
+- Add notifications/webhooks and optional real-time updates
+- Harden production deployment (rate limits, logging, backups)
 
-### Users (Owner only)
-- `GET /api/users` - List all users
-- `POST /api/users` - Create user
-- `PATCH /api/users/:id/deactivate` - Deactivate user
-- `PATCH /api/users/:id/role` - Change user role
+## Project Structure
 
-### Reports
-- `GET /api/reports/dashboard` - Dashboard metrics
-- `GET /api/reports/revenue-flow` - Revenue timeline
-- `GET /api/reports/top-customers` - Top customers
-- `GET /api/reports/product-performance` - Product analytics
-
-### Audit
-- `GET /api/audit/invoice/:id` - Invoice audit trail
-- `GET /api/audit` - Global audit log (Owner)
-
-## 🧪 Testing
-
-### Manual Testing Flow
-
-1. **Login as Owner**
-   - Upload invoice with multiple images
-   - Review OCR-extracted data
-   - Submit for approval
-   - Approve the invoice
-   - Generate PDF
-
-2. **Login as Staff**
-   - Upload invoice
-   - Review and submit
-   - Verify cannot approve
-
-3. **Login as Accountant**
-   - View approved invoices only
-   - Access reports
-   - Verify cannot upload/review
-
-## 🚧 Known Limitations
-
-- PDF generation is stubbed (placeholder implementation)
-- OCR service must be running separately
-- No real-time notifications
-- No bulk operations
-- No Excel/CSV export
-
-## 📝 Future Enhancements
-
-- Actual PDF generation with pdfkit
-- Email notifications
-- Bulk upload
-- Advanced search with Elasticsearch
-- Mobile app
-- Multi-tenancy support
-
-## 🤝 Contributing
-
-This is a lab project. Feel free to fork and extend for your needs.
-
-## 📄 License
-
-MIT License
-
-## 👨‍💻 Development Notes
-
-### Project Structure
 ```
 copilot/
 ├── server/
-│   ├── config/          # Database connections
+│   ├── config/          # Database connections and schema
 │   ├── controllers/     # Route handlers
 │   ├── middleware/      # Auth, upload, etc.
-│   ├── routes/          # API routes
+│   ├── routes/          # API routes (incl. documents)
 │   ├── services/        # Business logic
 │   ├── index.js         # Server entry
 │   └── seed.js          # Database seeding
 ├── client/
 │   ├── src/
-│   │   ├── components/  # Reusable components
-│   │   ├── contexts/    # React contexts
-│   │   ├── pages/       # Route pages
-│   │   ├── services/    # API client
-│   │   ├── App.jsx      # Main app component
-│   │   └── main.jsx     # React entry
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── pages/       # Includes review detail, approval queue, audit log
+│   │   ├── services/
+│   │   ├── App.jsx
+│   │   └── main.jsx
 │   ├── index.html
 │   └── vite.config.js
 ├── package.json
 └── .env.example
 ```
 
-### Adding New Features
+## Troubleshooting & Docs
 
-1. Backend: Create controller → service → route
-2. Frontend: Create page component → add route in App.jsx
-3. Update API client in `client/src/services/api.js`
-4. Follow existing patterns for consistency
+- Quick start card: QUICKSTART.txt
+- Step-by-step setup: SETUP.md
+- Common issues: TROUBLESHOOTING.md
+- API examples: API_TESTING.md
 
-### Code Style
+## License
 
-- Use ES6+ features
-- Async/await for promises
-- Functional components with hooks
-- Tailwind utility classes
-- Semantic HTML
-
-## 🐛 Troubleshooting
-
-**Database connection errors:**
-- Verify .env credentials
-- Check firewall/network access
-- Ensure databases exist
-
-**OCR not working:**
-- Verify OCR service is running
-- Check OCR_SERVICE_URL in .env
-- Test endpoint manually with curl
-
-**File upload fails:**
-- Check MAX_FILE_SIZE setting
-- Verify file types are allowed
-- Check disk space
-
-**Frontend can't reach backend:**
-- Verify proxy config in vite.config.js
-- Check backend is running on port 5000
-- Clear browser cache
-
-## 📞 Support
-
-For issues or questions, check the code comments or raise an issue in the repository.
+MIT License
 
 ---
 
-**Built with ❤️ for efficient invoice management**
+Built for efficient, auditable invoice management.
+   - PDF stored in MongoDB

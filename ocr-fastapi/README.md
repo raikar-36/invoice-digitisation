@@ -126,19 +126,24 @@ API documentation: `http://localhost:8000/docs`
 
 ```json
 {
-  "merchant_name": "string",
-  "merchant_address": "string",
-  "invoice_number": "string",
-  "transaction_date": "string",
+  "customer_name": "string or null",
+  "customer_address": "string or null",
+  "customer_phone": "string or null",
+  "customer_email": "string or null",
+  "customer_gstin": "string or null",
+  "invoice_number": "string or null",
+  "invoice_date": "string or null",
   "total_amount": 123.45,
   "tax_amount": 10.50,
   "discount_amount": 5.00,
-  "currency": "USD",
+  "currency": "INR",
   "line_items": [
     {
       "item_name": "Product Name",
+      "item_description": "string or null",
       "item_quantity": 2,
       "item_price": 50.00,
+      "item_tax_percentage": 18.0,
       "item_total": 100.00
     }
   ]
@@ -236,7 +241,7 @@ console.log(data);
 When processing multiple pages/images, the service intelligently merges data:
 
 ### Header Information
-- **First non-null wins**: merchant_name, merchant_address, invoice_number, transaction_date
+- **First non-null wins**: customer_name, customer_address, customer_phone, customer_email, customer_gstin, invoice_number, invoice_date
 - Ensures consistent metadata across pages
 
 ### Numerical Values
@@ -245,10 +250,11 @@ When processing multiple pages/images, the service intelligently merges data:
 
 ### Line Items
 - **Concatenated**: All line items from all pages
-- Maintains complete item list
+- Maintains complete item list with details (name, description, quantity, price, tax percentage, total)
 
 ### Currency
 - **Most common**: Uses the currency that appears most frequently
+- Defaults to "INR" if not detected
 - Handles mixed-currency edge cases
 
 ---
