@@ -2,6 +2,7 @@ const { getPostgresPool } = require('../config/database');
 const documentService = require('../services/document.service');
 const ocrService = require('../services/ocr.service');
 const auditService = require('../services/audit.service');
+const PDFDocument = require('pdfkit');
 
 // Validation helper
 const validateInvoiceData = (data) => {
@@ -813,35 +814,143 @@ exports.generatePdf = async (req, res) => {
 
     const pool = getPostgresPool();
 
-    // Check invoice is approved
-    const invoiceCheck = await pool.query(
-      'SELECT status FROM invoices WHERE id = $1',
+    // Fetch complete invoice data with items
+    const invoiceResult = await pool.query(
+      `SELECT i.*, 
+        c.name as customer_name, c.phone as customer_phone, 
+        c.email as customer_email, c.gstin as customer_gstin, 
+        c.address as customer_address
+       FROM invoices i
+       LEFT JOIN customers c ON i.customer_id = c.id
+       WHERE i.id = $1`,
       [id]
     );
 
-    if (invoiceCheck.rows.length === 0) {
+    if (invoiceResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Invoice not found'
       });
     }
 
-    if (invoiceCheck.rows[0].status !== 'APPROVED') {
+    const invoice = invoiceResult.rows[0];
+
+    if (invoice.status !== 'APPROVED') {
       return res.status(400).json({
         success: false,
         message: 'Only approved invoices can generate PDF'
       });
     }
 
-    // TODO: Implement actual PDF generation
-    // For now, create a placeholder
-    const pdfBuffer = Buffer.from('PDF PLACEHOLDER - TO BE IMPLEMENTED');
+    // Get invoice items
+    const itemsResult = await pool.query(
+      `SELECT ii.*, p.name as product_name
+       FROM invoice_items ii
+       JOIN products p ON ii.product_id = p.id
+       WHERE ii.invoice_id = $1
+       ORDER BY ii.id`,
+      [id]
+    );
+
+    const items = itemsResult.rows;
+
+    // Create PDF
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    await new Promise((resolve, reject) => {
+      doc.on('end', resolve);
+      doc.on('error', reject);
+
+      // Header
+      doc.fontSize(20).text('TAX INVOICE', { align: 'center' });
+      doc.moveDown();
+
+      // Invoice details
+      doc.fontSize(12);
+      doc.text(`Invoice Number: ${invoice.invoice_number}`);
+      doc.text(`Date: ${new Date(invoice.invoice_date).toLocaleDateString('en-IN')}`);
+      doc.text(`Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : 'N/A'}`);
+      doc.moveDown();
+
+      // Customer details
+      if (invoice.customer_name) {
+        doc.fontSize(14).text('Bill To:', { underline: true });
+        doc.fontSize(11);
+        doc.text(invoice.customer_name);
+        if (invoice.customer_phone) doc.text(`Phone: ${invoice.customer_phone}`);
+        if (invoice.customer_email) doc.text(`Email: ${invoice.customer_email}`);
+        if (invoice.customer_gstin) doc.text(`GSTIN: ${invoice.customer_gstin}`);
+        if (invoice.customer_address) doc.text(`Address: ${invoice.customer_address}`);
+        doc.moveDown();
+      }
+
+      // Items table
+      doc.fontSize(14).text('Items:', { underline: true });
+      doc.moveDown(0.5);
+
+      const tableTop = doc.y;
+      const itemX = 50;
+      const qtyX = 300;
+      const priceX = 370;
+      const totalX = 450;
+
+      // Table header
+      doc.fontSize(10).font('Helvetica-Bold');
+      doc.text('Item', itemX, tableTop);
+      doc.text('Qty', qtyX, tableTop);
+      doc.text('Price', priceX, tableTop);
+      doc.text('Total', totalX, tableTop);
+      
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+      // Table rows
+      doc.font('Helvetica');
+      let y = tableTop + 25;
+      items.forEach(item => {
+        doc.text(item.product_name, itemX, y, { width: 240 });
+        doc.text(item.quantity.toString(), qtyX, y);
+        doc.text(`₹${parseFloat(item.unit_price).toFixed(2)}`, priceX, y);
+        doc.text(`₹${parseFloat(item.line_total).toFixed(2)}`, totalX, y);
+        y += 25;
+      });
+
+      doc.moveTo(50, y).lineTo(550, y).stroke();
+      y += 10;
+
+      // Totals
+      doc.fontSize(11).font('Helvetica-Bold');
+      if (invoice.subtotal) {
+        doc.text('Subtotal:', 400, y);
+        doc.text(`₹${parseFloat(invoice.subtotal).toFixed(2)}`, totalX, y);
+        y += 20;
+      }
+      if (invoice.tax_amount) {
+        doc.text('Tax:', 400, y);
+        doc.text(`₹${parseFloat(invoice.tax_amount).toFixed(2)}`, totalX, y);
+        y += 20;
+      }
+      doc.fontSize(12);
+      doc.text('Total Amount:', 400, y);
+      doc.text(`₹${parseFloat(invoice.total_amount).toFixed(2)}`, totalX, y);
+
+      // Footer
+      doc.fontSize(9).font('Helvetica').moveDown(2);
+      doc.text('Thank you for your business!', { align: 'center' });
+      doc.text(`Generated on ${new Date().toLocaleString('en-IN')}`, { align: 'center' });
+
+      doc.end();
+    });
+
+    const pdfBuffer = Buffer.concat(chunks);
     
     // Store PDF in MongoDB
     const documentId = await documentService.storeDocument({
       invoiceId: id,
       documentType: 'GENERATED_PDF',
-      fileName: `invoice_${id}.pdf`,
+      fileName: `invoice_${invoice.invoice_number}.pdf`,
       contentType: 'application/pdf',
       fileData: pdfBuffer,
       position: null,

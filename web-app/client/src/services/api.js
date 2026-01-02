@@ -20,6 +20,7 @@ export const userAPI = {
   getAll: () => api.get('/users'),
   create: (userData) => api.post('/users', userData),
   deactivate: (id) => api.patch(`/users/${id}/deactivate`),
+  reactivate: (id) => api.patch(`/users/${id}/reactivate`),
   changeRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
   delete: (id) => api.delete(`/users/${id}`)
 };

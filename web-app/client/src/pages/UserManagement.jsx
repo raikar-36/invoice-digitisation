@@ -55,6 +55,18 @@ const UserManagement = () => {
     }
   };
 
+  const handleReactivate = async (userId) => {
+    if (!confirm('Are you sure you want to reactivate this user?')) return;
+    
+    try {
+      await userAPI.reactivate(userId);
+      loadUsers();
+    } catch (error) {
+      console.error('Failed to reactivate user:', error);
+      alert(error.response?.data?.message || 'Failed to reactivate user');
+    }
+  };
+
   const handleDelete = async (userId) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone. Users with invoices cannot be deleted.')) return;
     
@@ -115,12 +127,19 @@ const UserManagement = () => {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
-                      {user.status === 'ACTIVE' && (
+                      {user.status === 'ACTIVE' ? (
                         <button
                           onClick={() => handleDeactivate(user.id)}
                           className="text-sm px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
                         >
                           Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReactivate(user.id)}
+                          className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                          Reactivate
                         </button>
                       )}
                       <button

@@ -223,6 +223,62 @@ exports.changeUserRole = async (req, res) => {
   }
 };
 
+exports.reactivateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user.userId;
+
+    const pool = getPostgresPool();
+
+    // Check if user exists
+    const userCheck = await pool.query(
+      'SELECT id, email, role, status FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (userCheck.rows[0].status === 'ACTIVE') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is already active'
+      });
+    }
+
+    // Update status
+    await pool.query(
+      'UPDATE users SET status = $1 WHERE id = $2',
+      ['ACTIVE', id]
+    );
+
+    // Log audit
+    await auditService.log({
+      userId: currentUserId,
+      action: 'USER_REACTIVATED',
+      details: {
+        reactivated_user_id: parseInt(id),
+        email: userCheck.rows[0].email
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'User reactivated successfully'
+    });
+  } catch (error) {
+    console.error('Reactivate user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reactivate user'
+    });
+  }
+};
+
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
