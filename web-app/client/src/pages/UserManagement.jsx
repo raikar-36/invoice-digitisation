@@ -43,6 +43,30 @@ const UserManagement = () => {
     }
   };
 
+  const handleDeactivate = async (userId) => {
+    if (!confirm('Are you sure you want to deactivate this user?')) return;
+    
+    try {
+      await userAPI.deactivate(userId);
+      loadUsers();
+    } catch (error) {
+      console.error('Failed to deactivate user:', error);
+      alert(error.response?.data?.message || 'Failed to deactivate user');
+    }
+  };
+
+  const handleDelete = async (userId) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone. Users with invoices cannot be deleted.')) return;
+    
+    try {
+      await userAPI.delete(userId);
+      loadUsers();
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      alert(error.response?.data?.message || 'Failed to delete user');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -70,6 +94,7 @@ const UserManagement = () => {
                 <th className="text-left py-3 px-4">Role</th>
                 <th className="text-left py-3 px-4">Status</th>
                 <th className="text-left py-3 px-4">Created</th>
+                <th className="text-left py-3 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -87,6 +112,24 @@ const UserManagement = () => {
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-600">
                     {new Date(user.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex gap-2">
+                      {user.status === 'ACTIVE' && (
+                        <button
+                          onClick={() => handleDeactivate(user.id)}
+                          className="text-sm px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(user.id)}
+                        className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -33,11 +33,12 @@ const AuditLog = () => {
       setLoading(true);
       const [auditRes, usersRes] = await Promise.all([
         auditAPI.getAllAudit({}),
-        userAPI.getAll().catch(() => ({ data: [] }))
+        userAPI.getAll().catch(() => ({ data: { success: false, users: [] } }))
       ]);
       
-      setAuditLogs(auditRes.data || []);
-      setUsers(usersRes.data || []);
+      // Backend returns { success: true, logs: [...] }
+      setAuditLogs(auditRes.data.logs || []);
+      setUsers(usersRes.data.users || []);
     } catch (err) {
       setError('Failed to fetch audit logs');
       console.error(err);

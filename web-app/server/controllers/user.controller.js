@@ -222,3 +222,70 @@ exports.changeUserRole = async (req, res) => {
     });
   }
 };
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user.userId;
+
+    if (parseInt(id) === currentUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete yourself'
+      });
+    }
+
+    const pool = getPostgresPool();
+
+    // Check if user exists
+    const userCheck = await pool.query(
+      'SELECT id, email, role FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user has created invoices
+    const invoiceCheck = await pool.query(
+      'SELECT COUNT(*) as count FROM invoices WHERE created_by = $1',
+      [id]
+    );
+
+    if (parseInt(invoiceCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete user with associated invoices. Please deactivate instead.'
+      });
+    }
+
+    // Delete user
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+
+    // Log audit
+    await auditService.log({
+      userId: currentUserId,
+      action: 'USER_DELETED',
+      details: {
+        deleted_user_id: parseInt(id),
+        email: userCheck.rows[0].email,
+        role: userCheck.rows[0].role
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete user'
+    });
+  }
+};
