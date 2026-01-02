@@ -205,10 +205,26 @@ Return ONLY the JSON.
 
 def merge_invoice_data(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not results:
-        return {}
+        return {
+            "customer_name": None,
+            "customer_address": None,
+            "customer_phone": None,
+            "customer_email": None,
+            "customer_gstin": None,
+            "invoice_number": None,
+            "invoice_date": None,
+            "total_amount": None,
+            "tax_amount": None,
+            "discount_amount": None,
+            "currency": "INR",
+            "line_items": []
+        }
 
     if len(results) == 1:
-        return results[0]
+        result = results[0].copy()
+        if not result.get("currency"):
+            result["currency"] = "INR"
+        return result
 
     merged = {
         "customer_name": None,
@@ -360,10 +376,17 @@ async def process_invoice(
         print(f"Merging data from {len(results)} result(s)...")
         merged = merge_invoice_data(results)
 
-        # FIX: ensure currency is always a string
-        if not merged.get("currency"):
+        # Ensure currency is always a string
+        if not merged.get("currency") or not isinstance(merged.get("currency"), str):
             merged["currency"] = "INR"
-
+        
+        # Convert numeric fields to proper types or None
+        for field in ["total_amount", "tax_amount", "discount_amount"]:
+            if merged.get(field) == 0.0 and len(results) == 1:
+                # For single result, use original value (might be None)
+                if results[0].get(field) is None:
+                    merged[field] = None
+        
         print("Processing complete")
         return InvoiceResponse(**merged)
 
