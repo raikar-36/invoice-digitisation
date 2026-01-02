@@ -814,7 +814,7 @@ exports.generatePdf = async (req, res) => {
 
     const pool = getPostgresPool();
 
-    // Fetch complete invoice data with items
+    // Fetch invoice with authorization check
     const invoiceResult = await pool.query(
       `SELECT i.*, 
         c.name as customer_name, c.phone as customer_phone, 
@@ -829,7 +829,7 @@ exports.generatePdf = async (req, res) => {
     if (invoiceResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Invoice not found'
+        message: 'Invoice not found or access denied'
       });
     }
 
@@ -854,8 +854,25 @@ exports.generatePdf = async (req, res) => {
 
     const items = itemsResult.rows;
 
-    // Create PDF
-    const doc = new PDFDocument({ margin: 50 });
+    // Validate items exist
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invoice has no items'
+      });
+    }
+
+    // Helper function for currency formatting
+    const formatCurrency = (amount) => {
+      const numAmount = parseFloat(amount || 0);
+      return 'Rs. ' + new Intl.NumberFormat('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(numAmount);
+    };
+
+    // Create PDF with streaming
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const chunks = [];
 
     doc.on('data', chunk => chunks.push(chunk));
@@ -864,84 +881,176 @@ exports.generatePdf = async (req, res) => {
       doc.on('end', resolve);
       doc.on('error', reject);
 
-      // Header
-      doc.fontSize(20).text('TAX INVOICE', { align: 'center' });
-      doc.moveDown();
+      try {
+        // Header
+        doc.fontSize(24)
+           .font('Helvetica-Bold')
+           .text('TAX INVOICE', { align: 'center' });
+        doc.moveDown(1.5);
 
-      // Invoice details
-      doc.fontSize(12);
-      doc.text(`Invoice Number: ${invoice.invoice_number}`);
-      doc.text(`Date: ${new Date(invoice.invoice_date).toLocaleDateString('en-IN')}`);
-      doc.text(`Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : 'N/A'}`);
-      doc.moveDown();
+        // Invoice details section
+        doc.fontSize(11).font('Helvetica');
+        const leftColumn = 50;
+        let currentY = doc.y;
 
-      // Customer details
-      if (invoice.customer_name) {
-        doc.fontSize(14).text('Bill To:', { underline: true });
-        doc.fontSize(11);
-        doc.text(invoice.customer_name);
-        if (invoice.customer_phone) doc.text(`Phone: ${invoice.customer_phone}`);
-        if (invoice.customer_email) doc.text(`Email: ${invoice.customer_email}`);
-        if (invoice.customer_gstin) doc.text(`GSTIN: ${invoice.customer_gstin}`);
-        if (invoice.customer_address) doc.text(`Address: ${invoice.customer_address}`);
-        doc.moveDown();
+        doc.text(`Invoice Number: ${invoice.invoice_number || 'N/A'}`, leftColumn, currentY);
+        doc.text(`Date: ${invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-IN') : 'N/A'}`, leftColumn);
+        doc.text(`Due Date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN') : 'N/A'}`, leftColumn);
+        
+        doc.moveDown(2);
+
+        // Customer details
+        if (invoice.customer_name) {
+          doc.fontSize(13)
+             .font('Helvetica-Bold')
+             .text('Bill To:', { underline: true });
+          doc.moveDown(0.3);
+          
+          doc.fontSize(11).font('Helvetica');
+          doc.text(invoice.customer_name);
+          if (invoice.customer_phone) doc.text(`Phone: ${invoice.customer_phone}`);
+          if (invoice.customer_email) doc.text(`Email: ${invoice.customer_email}`);
+          if (invoice.customer_gstin) doc.text(`GSTIN: ${invoice.customer_gstin}`);
+          if (invoice.customer_address) {
+            doc.text('Address:', { continued: false });
+            doc.text(invoice.customer_address, { width: 300, lineGap: 2 });
+          }
+          doc.moveDown(1.5);
+        }
+
+        // Items table
+        doc.fontSize(13)
+           .font('Helvetica-Bold')
+           .text('Items:', { underline: true });
+        doc.moveDown(0.5);
+
+        const tableTop = doc.y;
+        const itemX = 50;
+        const qtyX = 320;
+        const priceX = 400;
+        const totalX = 480;
+        const pageHeight = doc.page.height - doc.page.margins.bottom;
+
+        // Table header
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Item', itemX, tableTop);
+        doc.text('Qty', qtyX, tableTop, { width: 70, align: 'right' });
+        doc.text('Price', priceX, tableTop, { width: 70, align: 'right' });
+        doc.text('Total', totalX, tableTop, { width: 70, align: 'right' });
+        
+        // Header underline
+        const headerBottom = tableTop + 15;
+        doc.moveTo(itemX, headerBottom)
+           .lineTo(totalX + 70, headerBottom)
+           .stroke();
+
+        // Table rows
+        doc.font('Helvetica').fontSize(10);
+        let y = headerBottom + 10;
+        
+        items.forEach((item, index) => {
+          // Check if we need a new page
+          if (y > pageHeight - 150) {
+            doc.addPage();
+            y = 50;
+            
+            // Redraw header on new page
+            doc.fontSize(10).font('Helvetica-Bold');
+            doc.text('Item', itemX, y);
+            doc.text('Qty', qtyX, y, { width: 70, align: 'right' });
+            doc.text('Price', priceX, y, { width: 70, align: 'right' });
+            doc.text('Total', totalX, y, { width: 70, align: 'right' });
+            
+            const newHeaderBottom = y + 15;
+            doc.moveTo(itemX, newHeaderBottom)
+               .lineTo(totalX + 70, newHeaderBottom)
+               .stroke();
+            
+            y = newHeaderBottom + 10;
+            doc.font('Helvetica').fontSize(10);
+          }
+          
+          // Item details with safe parsing
+          const productName = item.product_name || item.description || 'Unnamed Product';
+          const quantity = parseFloat(item.quantity || 0);
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const lineTotal = parseFloat(item.line_total || 0);
+          
+          // Handle long product names
+          const maxWidth = 260;
+          if (productName.length > 40) {
+            doc.text(productName.substring(0, 37) + '...', itemX, y, { width: maxWidth });
+          } else {
+            doc.text(productName, itemX, y, { width: maxWidth });
+          }
+          
+          doc.text(quantity.toString(), qtyX, y, { width: 70, align: 'right' });
+          doc.text(formatCurrency(unitPrice), priceX, y, { width: 70, align: 'right' });
+          doc.text(formatCurrency(lineTotal), totalX, y, { width: 70, align: 'right' });
+          
+          y += 20;
+        });
+
+        // Bottom line after items
+        doc.moveTo(itemX, y)
+           .lineTo(totalX + 70, y)
+           .stroke();
+        
+        y += 15;
+
+        // Totals section
+        doc.fontSize(11).font('Helvetica');
+        const totalsLabelX = 400;
+        const totalsValueX = 480;
+        
+        const subtotal = parseFloat(invoice.subtotal || 0);
+        if (subtotal > 0) {
+          doc.text('Subtotal:', totalsLabelX, y);
+          doc.text(formatCurrency(subtotal), totalsValueX, y, { 
+            width: 70, 
+            align: 'right' 
+          });
+          y += 20;
+        }
+        
+        const taxAmount = parseFloat(invoice.tax_amount || 0);
+        if (taxAmount > 0) {
+          doc.text('Tax:', totalsLabelX, y);
+          doc.text(formatCurrency(taxAmount), totalsValueX, y, { 
+            width: 70, 
+            align: 'right' 
+          });
+          y += 20;
+        }
+        
+        // Total amount with emphasis
+        const totalAmount = parseFloat(invoice.total_amount || 0);
+        doc.fontSize(12).font('Helvetica-Bold');
+        doc.text('Total Amount:', totalsLabelX, y);
+        doc.text(formatCurrency(totalAmount), totalsValueX, y, { 
+          width: 70, 
+          align: 'right' 
+        });
+
+        // Footer
+        doc.fontSize(9)
+           .font('Helvetica')
+           .moveDown(3);
+        doc.text('Thank you for your business!', { align: 'center' });
+        doc.text(`Generated on ${new Date().toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'numeric', 
+          year: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          second: 'numeric',
+          hour12: true
+        })}`, { align: 'center' });
+
+        doc.end();
+      } catch (err) {
+        reject(err);
       }
-
-      // Items table
-      doc.fontSize(14).text('Items:', { underline: true });
-      doc.moveDown(0.5);
-
-      const tableTop = doc.y;
-      const itemX = 50;
-      const qtyX = 300;
-      const priceX = 370;
-      const totalX = 450;
-
-      // Table header
-      doc.fontSize(10).font('Helvetica-Bold');
-      doc.text('Item', itemX, tableTop);
-      doc.text('Qty', qtyX, tableTop);
-      doc.text('Price', priceX, tableTop);
-      doc.text('Total', totalX, tableTop);
-      
-      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-
-      // Table rows
-      doc.font('Helvetica');
-      let y = tableTop + 25;
-      items.forEach(item => {
-        doc.text(item.product_name, itemX, y, { width: 240 });
-        doc.text(item.quantity.toString(), qtyX, y);
-        doc.text(`₹${parseFloat(item.unit_price).toFixed(2)}`, priceX, y);
-        doc.text(`₹${parseFloat(item.line_total).toFixed(2)}`, totalX, y);
-        y += 25;
-      });
-
-      doc.moveTo(50, y).lineTo(550, y).stroke();
-      y += 10;
-
-      // Totals
-      doc.fontSize(11).font('Helvetica-Bold');
-      if (invoice.subtotal) {
-        doc.text('Subtotal:', 400, y);
-        doc.text(`₹${parseFloat(invoice.subtotal).toFixed(2)}`, totalX, y);
-        y += 20;
-      }
-      if (invoice.tax_amount) {
-        doc.text('Tax:', 400, y);
-        doc.text(`₹${parseFloat(invoice.tax_amount).toFixed(2)}`, totalX, y);
-        y += 20;
-      }
-      doc.fontSize(12);
-      doc.text('Total Amount:', 400, y);
-      doc.text(`₹${parseFloat(invoice.total_amount).toFixed(2)}`, totalX, y);
-
-      // Footer
-      doc.fontSize(9).font('Helvetica').moveDown(2);
-      doc.text('Thank you for your business!', { align: 'center' });
-      doc.text(`Generated on ${new Date().toLocaleString('en-IN')}`, { align: 'center' });
-
-      doc.end();
     });
 
     const pdfBuffer = Buffer.concat(chunks);
@@ -950,18 +1059,18 @@ exports.generatePdf = async (req, res) => {
     const documentId = await documentService.storeDocument({
       invoiceId: id,
       documentType: 'GENERATED_PDF',
-      fileName: `invoice_${invoice.invoice_number}.pdf`,
+      fileName: `invoice_${invoice.invoice_number || 'unknown'}.pdf`,
       contentType: 'application/pdf',
       fileData: pdfBuffer,
       position: null,
       uploadedBy: userId
     });
 
-    // Update invoice with PDF reference
+    // Update invoice with PDF reference in transaction
     await pool.query(
       `UPDATE invoices 
        SET generated_pdf_document_id = $1, generated_pdf_timestamp = NOW()
-       WHERE id = $2`,
+       WHERE id = $2 AND status = 'APPROVED'`,
       [documentId, id]
     );
 
@@ -982,7 +1091,8 @@ exports.generatePdf = async (req, res) => {
     console.error('Generate PDF error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to generate PDF'
+      message: 'Failed to generate PDF',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
