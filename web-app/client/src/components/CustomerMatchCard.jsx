@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDate } from '../utils/dateFormatter';
 
 const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange }) => {
   const formatCurrency = (amount) => {
@@ -8,15 +9,6 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount || 0);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
   };
 
   return (

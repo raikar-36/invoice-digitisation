@@ -1,9 +1,11 @@
 # Invoice OCR Service
 
-A FastAPI service with a **single endpoint** that intelligently processes invoices from PDFs and images using Google Gemini AI.
+A FastAPI service with a **single endpoint** that intelligently processes invoices from PDFs and images using **Google Gemini AI** or **Groq** — switchable via environment variable.
 
 ## Features
 
+- **Multi-Provider Support**: Choose between Gemini or Groq using `OCR_MODE` env variable
+- **Processing Time Tracking**: Response includes processing time in seconds
 - **Single PDF** processing (automatically splits multi-page PDFs)
 - **Single image** processing
 - **Multiple images** processing (merges data intelligently)
@@ -84,12 +86,26 @@ pip install -r requirements.txt
 Create a `.env` file:
 
 ```bash
-# Required - Get your key at: https://aistudio.google.com/apikey
-GEMINI_API_KEY=your_gemini_api_key_here
+# OCR Mode: Choose your provider
+OCR_MODE="gemini"  # Options: "gemini" or "groq"
 
-# Optional
-GEMINI_MODEL=gemini-2.5-flash  # or other Gemini models
+# Gemini Configuration (Get your key at: https://aistudio.google.com/apikey)
+GEMINI_API_KEY="your_gemini_api_key_here"
+GEMINI_MODEL="gemini-2.5-flash"  # or gemini-1.5-flash, gemini-1.5-pro
+
+# Groq Configuration (Get your key at: https://console.groq.com/keys)
+GROQ_API_KEY="your_groq_api_key_here"
+GROQ_MODEL="meta-llama/llama-4-scout-17b-16e-instruct"  # Llama 4 Scout (128K context)
 ```
+
+**Available Groq Vision Models:**
+- `meta-llama/llama-4-scout-17b-16e-instruct` - Fast (~750 tps), 128K context
+- `meta-llama/llama-4-maverick-17b-128e-instruct` - Alternative option (~600 tps)
+
+**Provider Selection:****
+- Set `OCR_MODE="gemini"` to use Google Gemini
+- Set `OCR_MODE="groq"` to use Groq (ultra-fast inference)
+- Only the API key for your chosen provider is required
 
 ---
 
@@ -137,6 +153,7 @@ API documentation: `http://localhost:8000/docs`
   "tax_amount": 10.50,
   "discount_amount": 5.00,
   "currency": "INR",
+  "processing_time_seconds": 2.45,
   "line_items": [
     {
       "item_name": "Product Name",

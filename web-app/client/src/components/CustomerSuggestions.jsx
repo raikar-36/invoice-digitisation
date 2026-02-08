@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDate } from '../utils/dateFormatter';
 
 const CustomerSuggestions = ({ suggestions, onSelect }) => {
   const formatSimilarity = (score) => {
@@ -82,11 +83,7 @@ const CustomerSuggestions = ({ suggestions, onSelect }) => {
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">Last Purchase: </span>
                       <span className="font-semibold text-gray-900 dark:text-gray-100">
-                        {new Date(suggestion.last_purchase).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
+                        {formatDate(suggestion.last_purchase)}
                       </span>
                     </div>
                   )}

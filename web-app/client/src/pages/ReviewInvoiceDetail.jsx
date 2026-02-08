@@ -4,6 +4,14 @@ import { motion } from 'framer-motion';
 import { invoiceAPI, customerAPI } from '../services/api';
 import CustomerMatchCard from '../components/CustomerMatchCard';
 import CustomerSuggestions from '../components/CustomerSuggestions';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 const ReviewInvoiceDetail = () => {
   const { id } = useParams();
@@ -354,246 +362,245 @@ const ReviewInvoiceDetail = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-xl text-gray-600">Loading invoice...</div>
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!invoice) {
     return (
-      <div className="text-center py-12">
-        <p className="text-xl text-gray-600">Invoice not found</p>
-      </div>
+      <Card className="text-center py-12">
+        <CardContent className="pt-6">
+          <p className="text-xl text-muted-foreground">Invoice not found</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
-        <button
+        <Button
+          variant="ghost"
           onClick={() => navigate('/dashboard/review')}
-          className="text-indigo-600 hover:text-indigo-700 font-medium"
+          className="text-primary hover:text-primary"
         >
           ← Back to Review Queue
-        </button>
+        </Button>
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Review Invoice</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Review Invoice</h1>
+        <p className="text-muted-foreground mt-2">
           Verify and correct the data extracted by OCR
         </p>
       </div>
 
       {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6"
-        >
-          {error}
-        </motion.div>
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {success && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6"
-        >
-          {success}
-        </motion.div>
+        <Alert className="mb-6 bg-emerald-50 text-emerald-700 border-emerald-200">
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Document Preview */}
         <div className="lg:col-span-1">
-          <div className="card sticky top-6">
-            <h2 className="text-lg font-semibold mb-4">Document Preview</h2>
-            
-            {documents.length > 0 ? (
-              <div>
-                <div className="bg-gray-100 rounded-lg overflow-hidden mb-4" style={{ minHeight: '400px' }}>
-                  {documents[currentImageIndex]?.content_type === 'application/pdf' ? (
-                    <div className="flex flex-col items-center justify-center p-8 min-h-[400px]">
-                      <svg className="w-32 h-32 text-red-500 mb-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-                        <path d="M14 2v6h6"/>
-                        <path d="M9 13h6M9 17h3"/>
-                      </svg>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">PDF Document</h3>
-                      <p className="text-sm text-gray-600 mb-4 text-center">
-                        {documents[currentImageIndex]?.file_name || 'Invoice.pdf'}
-                      </p>
-                      <button
-                        onClick={() => window.open(`/api/documents/${documents[currentImageIndex]?.document_id}`, '_blank')}
-                        className="btn-primary flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Document Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {documents.length > 0 ? (
+                <div>
+                  <div className="bg-muted rounded-lg overflow-hidden mb-4" style={{ minHeight: '400px' }}>
+                    {documents[currentImageIndex]?.content_type === 'application/pdf' ? (
+                      <div className="flex flex-col items-center justify-center p-8 min-h-[400px]">
+                        <svg className="w-32 h-32 text-red-500 mb-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                          <path d="M14 2v6h6"/>
+                          <path d="M9 13h6M9 17h3"/>
                         </svg>
-                        Open in New Tab
-                      </button>
+                        <h3 className="text-lg font-semibold mb-2">PDF Document</h3>
+                        <p className="text-sm text-muted-foreground mb-4 text-center">
+                          {documents[currentImageIndex]?.file_name || 'Invoice.pdf'}
+                        </p>
+                        <Button
+                          onClick={() => window.open(`/api/documents/${documents[currentImageIndex]?.document_id}`, '_blank')}
+                        >
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Open in New Tab
+                        </Button>
+                      </div>
+                    ) : (
+                      <img
+                        src={`/api/documents/${documents[currentImageIndex]?.document_id}`}
+                        alt={`Invoice page ${currentImageIndex + 1}`}
+                        className="w-full h-auto"
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23999"%3EImage not available%3C/text%3E%3C/svg%3E';
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {documents.length > 1 && (
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
+                          disabled={currentImageIndex === 0}
+                        >
+                          ← Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          {currentImageIndex + 1} of {documents.length}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentImageIndex(Math.min(documents.length - 1, currentImageIndex + 1))}
+                          disabled={currentImageIndex === documents.length - 1}
+                        >
+                          Next →
+                        </Button>
+                      </div>
+
+                      {/* Thumbnail strip */}
+                      <div className="flex gap-2 overflow-x-auto">
+                        {documents.map((doc, idx) => (
+                          <img
+                            key={doc.document_id}
+                            src={`/api/documents/${doc.document_id}`}
+                            alt={`Thumbnail ${idx + 1}`}
+                            className={`w-16 h-16 object-cover rounded cursor-pointer border-2 ${
+                              idx === currentImageIndex ? 'border-primary' : 'border-border'
+                            }`}
+                            onClick={() => setCurrentImageIndex(idx)}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <img
-                      src={`/api/documents/${documents[currentImageIndex]?.document_id}`}
-                      alt={`Invoice page ${currentImageIndex + 1}`}
-                      className="w-full h-auto"
-                      onError={(e) => {
-                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23999"%3EImage not available%3C/text%3E%3C/svg%3E';
-                      }}
-                    />
                   )}
                 </div>
-
-                {documents.length > 1 && (
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <button
-                        onClick={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
-                        disabled={currentImageIndex === 0}
-                        className="btn-secondary text-sm disabled:opacity-50"
-                      >
-                        ← Previous
-                      </button>
-                      <span className="text-sm text-gray-600">
-                        {currentImageIndex + 1} of {documents.length}
-                      </span>
-                      <button
-                        onClick={() => setCurrentImageIndex(Math.min(documents.length - 1, currentImageIndex + 1))}
-                        disabled={currentImageIndex === documents.length - 1}
-                        className="btn-secondary text-sm disabled:opacity-50"
-                      >
-                        Next →
-                      </button>
-                    </div>
-
-                    {/* Thumbnail strip */}
-                    <div className="flex gap-2 overflow-x-auto">
-                      {documents.map((doc, idx) => (
-                        <img
-                          key={doc.document_id}
-                          src={`/api/documents/${doc.document_id}`}
-                          alt={`Thumbnail ${idx + 1}`}
-                          className={`w-16 h-16 object-cover rounded cursor-pointer border-2 ${
-                            idx === currentImageIndex ? 'border-indigo-600' : 'border-gray-300'
-                          }`}
-                          onClick={() => setCurrentImageIndex(idx)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 py-8">
-                No documents available
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No documents available
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column - Form */}
         <div className="lg:col-span-2">
-          <div className="card">
-            {/* Invoice Details */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Invoice Details</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Invoice Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="invoice_number"
-                    value={formData.invoice_number}
-                    onChange={handleInputChange}
-                    className={`input-field ${fieldErrors['invoice.invoice_number'] ? 'border-red-500 border-2' : ''}`}
-                    placeholder="INV-001"
-                  />
-                  {fieldErrors['invoice.invoice_number'] && (
-                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['invoice.invoice_number']}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Invoice Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="invoice_date"
-                    value={formData.invoice_date}
-                    onChange={handleInputChange}
-                    className={`input-field ${fieldErrors['invoice.invoice_date'] ? 'border-red-500 border-2' : ''}`}
-                  />
-                  {fieldErrors['invoice.invoice_date'] && (
-                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['invoice.invoice_date']}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Total Amount <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="total_amount"
-                    value={formData.total_amount}
-                    onChange={handleInputChange}
-                    className={`input-field ${fieldErrors['invoice.total_amount'] ? 'border-red-500 border-2' : ''}`}
-                    placeholder="0.00"
-                  />
-                  {fieldErrors['invoice.total_amount'] && (
-                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['invoice.total_amount']}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Tax Amount
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="tax_amount"
-                    value={formData.tax_amount}
-                    onChange={handleInputChange}
-                    className="input-field"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Discount Amount
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="discount_amount"
-                    value={formData.discount_amount}
-                    onChange={handleInputChange}
-                    className="input-field"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Currency
-                  </label>
-                  <select
-                    name="currency"
-                    value={formData.currency}
-                    onChange={handleInputChange}
-                    className="select-field"
-                  >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                  </select>
+          <Card>
+            <CardContent className="pt-6">
+              {/* Invoice Details */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold tracking-tight mb-4">Invoice Details</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice_number">
+                      Invoice Number <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="invoice_number"
+                      type="text"
+                      name="invoice_number"
+                      value={formData.invoice_number}
+                      onChange={handleInputChange}
+                      className={fieldErrors['invoice.invoice_number'] ? 'border-destructive' : ''}
+                      placeholder="INV-001"
+                    />
+                    {fieldErrors['invoice.invoice_number'] && (
+                      <p className="text-destructive text-xs">⚠️ {fieldErrors['invoice.invoice_number']}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invoice_date">
+                      Invoice Date <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="invoice_date"
+                      type="date"
+                      name="invoice_date"
+                      value={formData.invoice_date}
+                      onChange={handleInputChange}
+                      className={fieldErrors['invoice.invoice_date'] ? 'border-destructive' : ''}
+                    />
+                    {fieldErrors['invoice.invoice_date'] && (
+                      <p className="text-destructive text-xs">⚠️ {fieldErrors['invoice.invoice_date']}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="total_amount">
+                      Total Amount <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="total_amount"
+                      type="number"
+                      step="0.01"
+                      name="total_amount"
+                      value={formData.total_amount}
+                      onChange={handleInputChange}
+                      className={`font-mono tabular-nums ${fieldErrors['invoice.total_amount'] ? 'border-destructive' : ''}`}
+                      placeholder="0.00"
+                    />
+                    {fieldErrors['invoice.total_amount'] && (
+                      <p className="text-destructive text-xs">⚠️ {fieldErrors['invoice.total_amount']}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tax_amount">Tax Amount</Label>
+                    <Input
+                      id="tax_amount"
+                      type="number"
+                      step="0.01"
+                      name="tax_amount"
+                      value={formData.tax_amount}
+                      onChange={handleInputChange}
+                      className="font-mono tabular-nums"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discount_amount">Discount Amount</Label>
+                    <Input
+                      id="discount_amount"
+                      type="number"
+                      step="0.01"
+                      name="discount_amount"
+                      value={formData.discount_amount}
+                      onChange={handleInputChange}
+                      className="font-mono tabular-nums"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select name="currency" value={formData.currency} onValueChange={(value) => handleInputChange({ target: { name: 'currency', value } })}>
+                      <SelectTrigger id="currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INR">INR (₹)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-            </div>
 
             {/* Customer Details */}
             <div className="mb-8">
@@ -841,24 +848,26 @@ const ReviewInvoiceDetail = () => {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-between items-center pt-6 border-t">
-              <button
-                onClick={handleSaveDraft}
-                disabled={saving}
-                className="btn-secondary"
-              >
-                {saving ? 'Saving...' : 'Save Draft'}
-              </button>
-              <button
-                onClick={handleSubmitForApproval}
-                disabled={submitting}
-                className="btn-primary"
-              >
-                {submitting ? 'Submitting...' : 'Submit for Approval →'}
-              </button>
-            </div>
-          </div>
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-6 border-t">
+                <Button
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={saving}
+                >
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {saving ? 'Saving...' : 'Save Draft'}
+                </Button>
+                <Button
+                  onClick={handleSubmitForApproval}
+                  disabled={submitting}
+                >
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {submitting ? 'Submitting...' : 'Submit for Approval →'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

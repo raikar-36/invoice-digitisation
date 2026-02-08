@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { invoiceAPI } from '../services/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, Upload } from 'lucide-react';
 
 const UploadInvoice = () => {
   const [files, setFiles] = useState([]);
@@ -86,119 +90,121 @@ const UploadInvoice = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Upload Invoice</h1>
+      <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight mb-8">Upload Invoice</h1>
 
-      <div className="card">
-        <div
-          className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
-            dragActive 
-              ? 'border-indigo-600 bg-indigo-50 scale-105' 
-              : 'border-gray-300 bg-gray-50'
-          }`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          <div className="text-6xl mb-4">📄</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Drop invoice files here
-          </h3>
-          <p className="text-gray-600 mb-6">
-            or click to browse (JPEG, PNG, PDF • Max 10MB total)
-          </p>
-          <input
-            type="file"
-            multiple
-            accept=".jpg,.jpeg,.png,.pdf"
-            onChange={handleFileSelect}
-            className="hidden"
-            id="file-input"
-          />
-          <label htmlFor="file-input">
-            <motion.span
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="btn-primary inline-block cursor-pointer"
-            >
-              Select Files
-            </motion.span>
-          </label>
-        </div>
-
-        {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"
+      <Card>
+        <CardContent className="pt-6">
+          <div
+            className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
+              dragActive 
+                ? 'border-primary bg-primary/5 scale-105' 
+                : 'border-border bg-muted/50'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
           >
-            {error}
-          </motion.div>
-        )}
-
-        {files.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-6"
-          >
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Selected Files ({files.length})
+            <div className="text-6xl mb-4">📄</div>
+            <h3 className="text-xl font-semibold mb-2">
+              Drop invoice files here
             </h3>
-            <div className="space-y-2">
-              {files.map((file, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg"
+            <p className="text-muted-foreground mb-6">
+              or click to browse (JPEG, PNG, PDF • Max 10MB total)
+            </p>
+            <input
+              type="file"
+              multiple
+              accept=".jpg,.jpeg,.png,.pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="file-input"
+            />
+            <label htmlFor="file-input">
+              <Button asChild>
+                <motion.span
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="cursor-pointer"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">
-                      {file.type.startsWith('image') ? '🖼️' : '📄'}
-                    </span>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {(file.size / 1024).toFixed(2)} KB
-                      </p>
-                    </div>
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => removeFile(index)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    ✕
-                  </motion.button>
-                </motion.div>
-              ))}
-            </div>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Select Files
+                </motion.span>
+              </Button>
+            </label>
+          </div>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setFiles([])}
-                className="btn-secondary"
-              >
-                Clear All
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleUpload}
-                disabled={uploading}
-                className="btn-primary"
-              >
-                {uploading ? 'Uploading...' : 'Upload & Process'}
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
-      </div>
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {files.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6"
+            >
+              <h3 className="text-lg font-semibold mb-4">
+                Selected Files ({files.length})
+              </h3>
+              <div className="space-y-2">
+                {files.map((file, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card>
+                      <CardContent className="py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">
+                              {file.type.startsWith('image') ? '🖼️' : '📄'}
+                            </span>
+                            <div>
+                              <p className="font-medium">{file.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {(file.size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFile(index)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setFiles([])}
+                >
+                  Clear All
+                </Button>
+                <Button
+                  onClick={handleUpload}
+                  disabled={uploading}
+                >
+                  {uploading ? 'Uploading...' : 'Upload & Process'}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

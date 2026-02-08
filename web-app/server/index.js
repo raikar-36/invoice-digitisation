@@ -28,7 +28,7 @@ app.use('/api/invoices', require('./routes/invoice.routes'));
 app.use('/api/documents', require('./routes/document.routes'));
 app.use('/api/customers', require('./routes/customer.routes'));
 app.use('/api/products', require('./routes/product.routes'));
-app.use('/api/reports', require('./routes/report.routes'));
+app.use('/api/insights', require('./routes/insights.routes'));
 app.use('/api/audit', require('./routes/audit.routes'));
 
 // Health check

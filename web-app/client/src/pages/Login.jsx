@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { FileText, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -31,83 +37,89 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-background to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
+        className="w-full max-w-md"
       >
-        <div className="text-center mb-8">
-          <motion.h1
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.3 }}
-            className="text-3xl font-bold text-gray-900 mb-2"
-          >
-            Smart Invoice System
-          </motion.h1>
-          <p className="text-gray-600">Transform paper to digital clarity</p>
-        </div>
+        <Card className="border-border/50 shadow-lg">
+          <CardHeader className="space-y-4 text-center">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-primary/10 p-3">
+                <FileText className="h-10 w-10 text-primary" />
+              </div>
+            </div>
+            <div>
+              <CardTitle className="text-3xl font-bold tracking-tight">
+                Smart Invoice System
+              </CardTitle>
+              <CardDescription className="text-base mt-2">
+                Transform paper to digital clarity
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                >
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                </motion.div>
+              )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"
-            >
-              {error}
-            </motion.div>
-          )}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field"
-              placeholder="your@email.com"
-              required
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-field"
-              placeholder="••••••••"
-              required
-            />
-          </div>
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="w-full"
+                size="lg"
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </form>
 
-          <motion.button
-            type="submit"
-            disabled={loading}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full btn-primary"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </motion.button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center mb-2">Demo Accounts:</p>
-          <div className="space-y-1 text-xs text-gray-600">
-            <p>Owner: owner@invoice.com / admin123</p>
-            <p>Staff: staff@invoice.com / staff123</p>
-            <p>Accountant: accountant@invoice.com / accountant123</p>
-          </div>
-        </div>
+            <div className="mt-8 pt-6 border-t">
+              <p className="text-xs font-semibold text-muted-foreground text-center mb-3">
+                Demo Accounts
+              </p>
+              <div className="space-y-1.5 text-xs text-muted-foreground">
+                <p className="font-mono">Owner: owner@invoice.com / admin123</p>
+                <p className="font-mono">Staff: staff@invoice.com / staff123</p>
+                <p className="font-mono">Accountant: accountant@invoice.com / accountant123</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
     </div>
   );

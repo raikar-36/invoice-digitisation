@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { auditAPI, userAPI, invoiceAPI } from '../services/api';
+import { FileSearch, Loader2, Filter, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 
 const AuditLog = () => {
   const [auditLogs, setAuditLogs] = useState([]);
@@ -106,18 +116,18 @@ const AuditLog = () => {
   ];
 
   const getActionBadgeColor = (action) => {
-    const colors = {
-      'INVOICE_UPLOADED': 'bg-blue-100 text-blue-800',
-      'INVOICE_UPDATED': 'bg-yellow-100 text-yellow-800',
-      'INVOICE_SUBMITTED': 'bg-purple-100 text-purple-800',
-      'INVOICE_APPROVED': 'bg-green-100 text-green-800',
-      'INVOICE_REJECTED': 'bg-red-100 text-red-800',
-      'PDF_GENERATED': 'bg-indigo-100 text-indigo-800',
-      'USER_CREATED': 'bg-teal-100 text-teal-800',
-      'USER_DEACTIVATED': 'bg-gray-100 text-gray-800',
-      'ROLE_CHANGED': 'bg-orange-100 text-orange-800'
+    const variants = {
+      'INVOICE_UPLOADED': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+      'INVOICE_UPDATED': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
+      'INVOICE_SUBMITTED': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800',
+      'INVOICE_APPROVED': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+      'INVOICE_REJECTED': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800',
+      'PDF_GENERATED': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800',
+      'USER_CREATED': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border border-teal-200 dark:border-teal-800',
+      'USER_DEACTIVATED': 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-200 dark:border-slate-800',
+      'ROLE_CHANGED': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800'
     };
-    return colors[action] || 'bg-gray-100 text-gray-800';
+    return variants[action] || 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-200 dark:border-slate-800';
   };
 
   // Pagination
@@ -129,232 +139,240 @@ const AuditLog = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-xl text-gray-600">Loading audit logs...</div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Audit Log</h1>
-        <p className="text-gray-600 mt-2">
+    <div className="space-y-6">
+      <div>
+        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">
+          Audit Log
+        </h1>
+        <p className="text-muted-foreground mt-2">
           Complete system audit trail of all user actions and invoice lifecycle events
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {/* Filters */}
-      <div className="card mb-6">
-        <h2 className="text-lg font-semibold mb-4">Filters</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              User
-            </label>
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="select-field"
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <Label>User</Label>
+              <Select value={selectedUser || "ALL"} onValueChange={(value) => setSelectedUser(value === "ALL" ? "" : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Users</SelectItem>
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Action</Label>
+              <Select value={selectedAction || "ALL"} onValueChange={(value) => setSelectedAction(value === "ALL" ? "" : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Actions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Actions</SelectItem>
+                  {actionTypes.map(action => (
+                    <SelectItem key={action} value={action}>
+                      {action.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="searchInvoice">Invoice #</Label>
+              <Input
+                id="searchInvoice"
+                type="text"
+                value={searchInvoice}
+                onChange={(e) => setSearchInvoice(e.target.value)}
+                placeholder="Search invoice..."
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              Showing {filteredLogs.length} of {auditLogs.length} records
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
             >
-              <option value="">All Users</option>
-              {users.map(user => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
+              <X className="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Action
-            </label>
-            <select
-              value={selectedAction}
-              onChange={(e) => setSelectedAction(e.target.value)}
-              className="select-field"
-            >
-              <option value="">All Actions</option>
-              {actionTypes.map(action => (
-                <option key={action} value={action}>
-                  {action.replace(/_/g, ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="input-field"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="input-field"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Invoice #
-            </label>
-            <input
-              type="text"
-              value={searchInvoice}
-              onChange={(e) => setSearchInvoice(e.target.value)}
-              placeholder="Search invoice..."
-              className="input-field"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-600">
-            Showing {filteredLogs.length} of {auditLogs.length} records
-          </p>
-          <button
-            onClick={clearFilters}
-            className="btn-secondary text-sm"
-          >
-            Clear Filters
-          </button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Audit Log Table */}
       {filteredLogs.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card text-center py-12"
-        >
-          <div className="text-6xl mb-4">📜</div>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
-            No Audit Logs Found
-          </h3>
-          <p className="text-gray-600">
-            {selectedUser || selectedAction || startDate || endDate || searchInvoice
-              ? 'Try adjusting your filters'
-              : 'No activity recorded yet'}
-          </p>
-        </motion.div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileSearch className="h-16 w-16 text-muted-foreground mb-4" />
+            <CardTitle className="text-xl mb-2">
+              No Audit Logs Found
+            </CardTitle>
+            <CardDescription>
+              {selectedUser || selectedAction || startDate || endDate || searchInvoice
+                ? 'Try adjusting your filters'
+                : 'No activity recorded yet'}
+            </CardDescription>
+          </CardContent>
+        </Card>
       ) : (
         <>
-          <div className="card overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">
-                    Timestamp
-                  </th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">
-                    User
-                  </th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">
-                    Action
-                  </th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">
-                    Invoice
-                  </th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">
-                    Details
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentLogs.map((log, index) => (
-                  <motion.tr
-                    key={log.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.02 }}
-                    className="border-b border-gray-100 hover:bg-gray-50"
-                  >
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {log.user_name || `User ${log.user_id}`}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getActionBadgeColor(log.action)}`}>
-                        {log.action.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {log.invoice_id ? (
-                        <a 
-                          href={`/dashboard/invoices/${log.invoice_id}`}
-                          className="text-indigo-600 hover:text-indigo-800 font-medium"
-                        >
-                          #{log.invoice_id}
-                        </a>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">
-                      {log.details && Object.keys(log.details).length > 0 ? (
-                        <details className="cursor-pointer">
-                          <summary className="text-indigo-600 hover:text-indigo-800">
-                            View Details
-                          </summary>
-                          <pre className="mt-2 text-xs bg-gray-50 p-2 rounded overflow-x-auto">
-                            {JSON.stringify(log.details, null, 2)}
-                          </pre>
-                        </details>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="uppercase text-xs font-bold">
+                        Timestamp
+                      </TableHead>
+                      <TableHead className="uppercase text-xs font-bold">
+                        User
+                      </TableHead>
+                      <TableHead className="uppercase text-xs font-bold">
+                        Action
+                      </TableHead>
+                      <TableHead className="uppercase text-xs font-bold">
+                        Invoice
+                      </TableHead>
+                      <TableHead className="uppercase text-xs font-bold">
+                        Details
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentLogs.map((log, index) => (
+                      <motion.tr
+                        key={log.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.02 }}
+                        className="hover:bg-muted/50 transition-colors"
+                      >
+                        <TableCell className="text-sm font-mono">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.user_name || `User ${log.user_id}`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getActionBadgeColor(log.action)}>
+                            {log.action.replace(/_/g, ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.invoice_id ? (
+                            <a 
+                              href={`/dashboard/invoices/${log.invoice_id}`}
+                              className="text-primary hover:underline font-medium"
+                            >
+                              #{log.invoice_id}
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.details && Object.keys(log.details).length > 0 ? (
+                            <details className="cursor-pointer">
+                              <summary className="text-primary hover:underline">
+                                View Details
+                              </summary>
+                              <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto font-mono">
+                                {JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            </details>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 mt-6">
-              <button
+            <div className="flex justify-center items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="btn-secondary text-sm disabled:opacity-50"
               >
                 ← Previous
-              </button>
+              </Button>
               
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </span>
               
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="btn-secondary text-sm disabled:opacity-50"
               >
                 Next →
-              </button>
+              </Button>
             </div>
           )}
         </>

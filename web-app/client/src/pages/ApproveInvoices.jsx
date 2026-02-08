@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2, Loader2, XCircle, Eye } from 'lucide-react';
 import { invoiceAPI } from '../services/api';
 import { showToast, confirmAction } from '../utils/toast.jsx';
+import { formatDate } from '../utils/dateFormatter';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 const ApproveInvoices = () => {
   const navigate = useNavigate();
@@ -114,7 +122,7 @@ const ApproveInvoices = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-xl text-gray-600">Loading invoices...</div>
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -122,14 +130,14 @@ const ApproveInvoices = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Approval Queue</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Approval Queue</h1>
+        <p className="text-muted-foreground mt-2">
           Review and approve invoices that have been submitted by staff
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 px-4 py-3 rounded-xl mb-6">
           {error}
         </div>
       )}
@@ -138,19 +146,22 @@ const ApproveInvoices = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="card text-center py-12"
         >
-          <div className="text-6xl mb-4">✅</div>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
-            No Pending Approvals
-          </h3>
-          <p className="text-gray-600">
-            All submitted invoices have been processed. Great job!
-          </p>
+          <Card className="text-center py-12">
+            <CardContent className="pt-6">
+              <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-emerald-500 dark:text-emerald-400" />
+              <h3 className="text-xl font-semibold mb-2">
+                No Pending Approvals
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                All submitted invoices have been processed. Great job!
+              </p>
+            </CardContent>
+          </Card>
         </motion.div>
       ) : (
         <>
-          <div className="mb-4 text-sm text-gray-600">
+          <div className="mb-4 text-sm text-muted-foreground">
             Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
           </div>
 
@@ -161,121 +172,126 @@ const ApproveInvoices = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="card hover:shadow-xl transition-all duration-200"
             >
-              <div className="mb-4">
-                <div className="flex items-center gap-4 mb-3">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    Invoice #{invoice.invoice_number}
-                  </h3>
-                  <span className="status-badge status-pending-approval">
-                    PENDING APPROVAL
-                  </span>
-                </div>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="mb-4">
+                    <div className="flex items-center gap-4 mb-3">
+                      <h3 className="text-xl font-semibold">
+                        Invoice #{invoice.invoice_number}
+                      </h3>
+                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
+                        PENDING APPROVAL
+                      </Badge>
+                    </div>
 
-                {/* Customer Info */}
-                {invoice.customer_name && (
-                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Customer Details</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-gray-500">Name:</span>
-                        <span className="ml-2 font-medium">{invoice.customer_name}</span>
+                    {/* Customer Info */}
+                    {invoice.customer_name && (
+                      <div className="mb-4 p-3 bg-muted rounded-lg">
+                        <h4 className="text-sm font-semibold mb-2">Customer Details</h4>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Name:</span>
+                            <span className="ml-2 font-medium">{invoice.customer_name}</span>
+                          </div>
+                          {invoice.customer_phone && (
+                            <div>
+                              <span className="text-muted-foreground">Phone:</span>
+                              <span className="ml-2 font-medium">{invoice.customer_phone}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {invoice.customer_phone && (
-                        <div>
-                          <span className="text-gray-500">Phone:</span>
-                          <span className="ml-2 font-medium">{invoice.customer_phone}</span>
-                        </div>
-                      )}
+                    )}
+                      
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                      <div>
+                        <span className="text-muted-foreground">Invoice Date:</span>
+                        <p className="font-medium">
+                          {formatDate(invoice.invoice_date)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Amount:</span>
+                        <p className="font-medium font-mono tabular-nums">
+                          ₹{invoice.total_amount?.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tax:</span>
+                        <p className="font-medium font-mono tabular-nums">
+                          ₹{(invoice.tax_amount || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Submitted:</span>
+                        <p className="font-medium">
+                          {invoice.submitted_at 
+                            ? formatDate(invoice.submitted_at)
+                            : 'N/A'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                  
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                  <div>
-                    <span className="text-gray-500">Invoice Date:</span>
-                    <p className="font-medium text-gray-900">
-                      {new Date(invoice.invoice_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Amount:</span>
-                    <p className="font-medium text-gray-900">
-                      ₹{invoice.total_amount?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Tax:</span>
-                    <p className="font-medium text-gray-900">
-                      ₹{(invoice.tax_amount || 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Submitted:</span>
-                    <p className="font-medium text-gray-900">
-                      {invoice.submitted_at 
-                        ? new Date(invoice.submitted_at).toLocaleDateString()
-                        : 'N/A'}
-                    </p>
-                  </div>
-                </div>
 
-                {invoice.submitted_by_name && (
-                  <p className="text-sm text-gray-600 mb-4">
-                    Submitted by: <strong>{invoice.submitted_by_name}</strong>
-                  </p>
-                )}
+                    {invoice.submitted_by_name && (
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Submitted by: <strong>{invoice.submitted_by_name}</strong>
+                      </p>
+                    )}
 
-                {/* Line Items */}
-                {invoice.items && invoice.items.length > 0 && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                      Line Items ({invoice.items.length})
-                    </h4>
-                    <div className="space-y-1 text-sm">
-                      {invoice.items.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex justify-between">
-                          <span className="text-gray-700">
-                            {item.product_name || item.description} x {item.quantity}
-                          </span>
-                          <span className="font-medium">
-                            ₹{parseFloat(item.line_total).toLocaleString()}
-                          </span>
+                    {/* Line Items */}
+                    {invoice.items && invoice.items.length > 0 && (
+                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h4 className="text-sm font-semibold mb-2">
+                          Line Items ({invoice.items.length})
+                        </h4>
+                        <div className="space-y-1 text-sm">
+                          {invoice.items.slice(0, 3).map((item, idx) => (
+                            <div key={idx} className="flex justify-between">
+                              <span>
+                                {item.product_name || item.description} x {item.quantity}
+                              </span>
+                              <span className="font-medium font-mono tabular-nums">
+                                ₹{parseFloat(item.line_total).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                          {invoice.items.length > 3 && (
+                            <div className="text-muted-foreground text-xs pt-1">
+                              + {invoice.items.length - 3} more items
+                            </div>
+                          )}
                         </div>
-                      ))}
-                      {invoice.items.length > 3 && (
-                        <div className="text-gray-500 text-xs pt-1">
-                          + {invoice.items.length - 3} more items
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className="flex gap-3 pt-4 border-t">
-                <button
-                  onClick={() => handleViewDetails(invoice.id)}
-                  className="btn-secondary flex-1"
-                >
-                  View Details
-                </button>
-                <button
-                  onClick={() => handleRejectClick(invoice)}
-                  disabled={processing}
-                  className="btn-danger flex-1"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleApprove(invoice)}
-                  disabled={processing}
-                  className="btn-primary flex-1"
-                >
-                  {processing ? 'Processing...' : 'Approve →'}
-                </button>
-              </div>
+                  <div className="flex gap-3 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleViewDetails(invoice.id)}
+                    >
+                      View Details
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => handleRejectClick(invoice)}
+                      disabled={processing}
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={() => handleApprove(invoice)}
+                      disabled={processing}
+                    >
+                      {processing ? 'Processing...' : 'Approve →'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -283,97 +299,83 @@ const ApproveInvoices = () => {
         {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-8">
-            <button
+            <Button
+              variant="outline"
               onClick={goToPrevPage}
               disabled={currentPage === 1}
-              className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               ← Previous
-            </button>
-            <span className="text-gray-700 font-medium">
+            </Button>
+            <span className="font-medium">
               Page {currentPage} of {totalPages}
             </span>
-            <button
+            <Button
+              variant="outline"
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
-              className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next →
-            </button>
+            </Button>
           </div>
         )}
       </>
       )}
 
       {/* Rejection Modal */}
-      <AnimatePresence>
-        {showRejectModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            onClick={() => !processing && setShowRejectModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
+      <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Reject Invoice</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Invoice: <strong>{selectedInvoice?.invoice_number}</strong>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Amount: <strong className="font-mono tabular-nums">₹{selectedInvoice?.total_amount?.toLocaleString()}</strong>
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="rejection-reason">
+                Reason for Rejection <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="rejection-reason"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={4}
+                placeholder="Explain why this invoice is being rejected..."
+                disabled={processing}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                The invoice will be returned to PENDING_REVIEW status
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRejectModal(false)}
+              disabled={processing}
             >
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Reject Invoice
-              </h2>
-              
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  Invoice: <strong>{selectedInvoice?.invoice_number}</strong>
-                </p>
-                <p className="text-sm text-gray-600">
-                  Amount: <strong>₹{selectedInvoice?.total_amount?.toLocaleString()}</strong>
-                </p>
-              </div>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectSubmit}
+              disabled={processing || !rejectionReason.trim()}
+            >
+              {processing ? 'Rejecting...' : 'Confirm Rejection'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason for Rejection <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  className="input-field"
-                  rows="4"
-                  placeholder="Explain why this invoice is being rejected..."
-                  disabled={processing}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  The invoice will be returned to PENDING_REVIEW status
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowRejectModal(false)}
-                  disabled={processing}
-                  className="btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRejectSubmit}
-                  disabled={processing || !rejectionReason.trim()}
-                  className="btn-danger flex-1"
-                >
-                  {processing ? 'Rejecting...' : 'Confirm Rejection'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="mt-6 text-sm text-gray-600">
+      <div className="mt-6 text-sm text-muted-foreground">
         <p><strong>Tip:</strong> Approved invoices will be saved to the database and marked as APPROVED.</p>
       </div>
     </div>

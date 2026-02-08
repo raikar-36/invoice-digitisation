@@ -2,7 +2,17 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { userAPI } from '../services/api';
 import { showToast, confirmAction } from '../utils/toast.jsx';
+import { formatDate } from '../utils/dateFormatter';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
@@ -89,7 +99,7 @@ const UserManagement = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
       </div>
     );
   }
@@ -97,142 +107,143 @@ const UserManagement = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">User Management</h1>
-        <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">User Management</h1>
+        <Button onClick={() => setShowCreateModal(true)}>
           + Create User
-        </button>
+        </Button>
       </div>
 
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4">Name</th>
-                <th className="text-left py-3 px-4">Email</th>
-                <th className="text-left py-3 px-4">Role</th>
-                <th className="text-left py-3 px-4">Status</th>
-                <th className="text-left py-3 px-4">Created</th>
-                <th className="text-left py-3 px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+      <Card>
+        <CardContent className="pt-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {users.map(user => (
-                <tr key={user.id} className="border-b border-gray-100">
-                  <td className="py-3 px-4 font-medium">{user.name}</td>
-                  <td className="py-3 px-4">{user.email}</td>
-                  <td className="py-3 px-4">
-                    <span className="status-badge bg-gray-200 text-gray-800">{user.role}</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`status-badge ${user.status === 'ACTIVE' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{user.role}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={user.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100/80 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800'}>
                       {user.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-gray-600">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="py-3 px-4">
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(user.created_at)}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex gap-2">
                       {user.id === currentUser?.id ? (
-                        <span className="text-xs text-gray-500 italic px-3 py-1">You cannot modify your own account</span>
+                        <span className="text-xs text-muted-foreground italic px-3 py-1">You cannot modify your own account</span>
                       ) : (
                         <>
                           {user.status === 'ACTIVE' ? (
-                            <button
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleDeactivate(user.id)}
-                              className="text-sm px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
                             >
                               Deactivate
-                            </button>
+                            </Button>
                           ) : (
-                            <button
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleReactivate(user.id)}
-                              className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                             >
                               Reactivate
-                            </button>
+                            </Button>
                           )}
-                          <button
+                          <Button
+                            variant="destructive"
+                            size="sm"
                             onClick={() => handleDelete(user.id)}
-                            className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
                           >
                             Delete
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl p-8 w-full max-w-md"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Create New User</h2>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input-field"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="input-field"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="input-field"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="select-field"
-                >
-                  <option value="STAFF">Staff</option>
-                  <option value="ACCOUNTANT">Accountant</option>
-                </select>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Create User
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="role">Role</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="STAFF">Staff</SelectItem>
+                  <SelectItem value="ACCOUNTANT">Accountant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Create User
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 ﻿"""
-Invoice OCR Processing Service - Native Google Gemini SDK
+Invoice OCR Processing Service - Multi-Provider (Gemini & Grok)
 """
 
 from dotenv import load_dotenv
@@ -15,7 +15,10 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 import google.generativeai as genai
+from openai import OpenAI
+import base64
 from PIL import Image
+import time
 
 try:
     from pdf2image import convert_from_path
@@ -50,39 +53,77 @@ class InvoiceResponse(BaseModel):
     currency: str = "INR"
 
     line_items: List[LineItem] = Field(default_factory=list)
+    
+    processing_time_seconds: Optional[float] = None
 
+# Global model instances
 gemini_model = None
+groq_client = None
+ocr_mode = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global gemini_model
+    global gemini_model, groq_client, ocr_mode
 
     print("=" * 70)
-    print("Invoice OCR Service Starting (Native Gemini SDK)")
+    print("Invoice OCR Service Starting (Multi-Provider)")
     print("=" * 70)
 
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
-
+    # Get OCR mode from environment
+    ocr_mode = os.getenv("OCR_MODE", "gemini").lower()
+    
     if PDF_SUPPORT:
         print("PDF Support: Enabled")
     else:
         print("PDF Support: Disabled (install poppler)")
 
-    if not api_key or "your_" in api_key.lower():
-        print("ERROR: GEMINI_API_KEY not set or using placeholder")
-        print("Get your key at: https://aistudio.google.com/apikey")
-        gemini_model = None
-    else:
-        try:
-            genai.configure(api_key=api_key)
-            gemini_model = genai.GenerativeModel(model_name)
-            print(f"Gemini API: Connected")
-            print(f"Model: {model_name}")
-        except Exception as e:
-            print(f"Gemini API: Failed to initialize - {e}")
+    print(f"OCR Mode: {ocr_mode.upper()}")
+    print("-" * 70)
+
+    # Initialize based on mode
+    if ocr_mode == "groq":
+        # Initialize Groq
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        groq_model = os.getenv("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+        
+        if not groq_api_key or "your_" in groq_api_key.lower():
+            print("ERROR: GROQ_API_KEY not set or using placeholder")
+            print("Get your key at: https://console.groq.com/keys")
+            groq_client = None
+        else:
+            try:
+                groq_client = OpenAI(
+                    api_key=groq_api_key,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+                print(f"Groq API: Connected")
+                print(f"Model: {groq_model}")
+            except Exception as e:
+                print(f"Groq API: Failed to initialize - {e}")
+                groq_client = None
+    
+    elif ocr_mode == "gemini":
+        # Initialize Gemini
+        gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        
+        if not gemini_api_key or "your_" in gemini_api_key.lower():
+            print("ERROR: GEMINI_API_KEY not set or using placeholder")
+            print("Get your key at: https://aistudio.google.com/apikey")
             gemini_model = None
+        else:
+            try:
+                genai.configure(api_key=gemini_api_key)
+                gemini_model = genai.GenerativeModel(gemini_model_name)
+                print(f"Gemini API: Connected")
+                print(f"Model: {gemini_model_name}")
+            except Exception as e:
+                print(f"Gemini API: Failed to initialize - {e}")
+                gemini_model = None
+    
+    else:
+        print(f"ERROR: Invalid OCR_MODE '{ocr_mode}'. Use 'gemini' or 'groq'")
 
     print("=" * 70)
     print(f"Server ready at http://localhost:8000")
@@ -92,13 +133,14 @@ async def lifespan(app: FastAPI):
     yield
 
     gemini_model = None
+    groq_client = None
     print("Service shutdown complete")
 
 
 app = FastAPI(
-    title="Invoice OCR API (Native Gemini)",
-    description="Invoice OCR powered by Google Gemini (Native SDK)",
-    version="1.0.0",
+    title="Invoice OCR API (Multi-Provider)",
+    description="Invoice OCR powered by Google Gemini or Groq",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -136,7 +178,113 @@ async def pdf_to_images(pdf_path: str, dpi: int = 300) -> List[str]:
     return paths
 
 
-async def process_single_image(image_path: str) -> Dict[str, Any]:
+def encode_image_base64(image_path: str) -> str:
+    """Encode image to base64 for Groq API"""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+async def process_single_image_groq(image_path: str) -> Dict[str, Any]:
+    """Process image using Groq API"""
+    if not groq_client:
+        return {}
+
+    try:
+        # Encode image to base64
+        base64_image = encode_image_base64(image_path)
+        
+        # Determine image format
+        ext = Path(image_path).suffix.lower()
+        mime_type = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp'
+        }.get(ext, 'image/jpeg')
+        
+        prompt = '''Extract invoice data and return ONLY valid JSON with this exact structure:
+
+{
+  "customer_name": "string or null",
+  "customer_address": "string or null",
+  "customer_phone": "string or null",
+  "customer_email": "string or null",
+  "customer_gstin": "string or null",
+  "invoice_number": "string or null",
+  "invoice_date": "string or null",
+  "total_amount": number or null,
+  "tax_amount": number or null,
+  "discount_amount": number or null,
+  "currency": "string or null",
+  "line_items": [
+    {
+      "item_name": "string",
+      "item_description": "string or null",
+      "item_quantity": number or null,
+      "item_price": number or null,
+      "item_tax_percentage": number or null,
+      "item_total": number or null
+    }
+  ]
+}
+
+If a field is not present, use null.
+Return ONLY the JSON.'''
+
+        groq_model = os.getenv("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+        
+        response = groq_client.chat.completions.create(
+            model=groq_model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.0
+        )
+        
+        content = response.choices[0].message.content
+        
+        # Clean up response
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        
+        content = content.strip()
+        
+        print(f"Full Groq response ({len(content)} chars):")
+        print(content)
+        print("=" * 50)
+        
+        result = json.loads(content)
+        print(f"Extracted from {Path(image_path).name}")
+        return result
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON parse error for {image_path}: {e}")
+        print(f"Full response ({len(content)} chars):")
+        print(content)
+        print(f"Character at error position: {repr(content[e.pos-5:e.pos+5]) if e.pos < len(content) else 'N/A'}")
+        return {}
+    except Exception as e:
+        print(f"Error processing {image_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
+async def process_single_image_gemini(image_path: str) -> Dict[str, Any]:
+    """Process image using Gemini API"""
     if not gemini_model:
         return {}
 
@@ -173,7 +321,6 @@ If a field is not present, use null.
 Return ONLY the JSON.
 '''
 
-        
         response = gemini_model.generate_content([prompt, img])
         content = response.text
         
@@ -200,6 +347,17 @@ Return ONLY the JSON.
         return {}
     except Exception as e:
         print(f"Error processing {image_path}: {e}")
+        return {}
+
+
+async def process_single_image(image_path: str) -> Dict[str, Any]:
+    """Route to appropriate OCR provider based on mode"""
+    if ocr_mode == "groq":
+        return await process_single_image_groq(image_path)
+    elif ocr_mode == "gemini":
+        return await process_single_image_gemini(image_path)
+    else:
+        print(f"Invalid OCR mode: {ocr_mode}")
         return {}
 
 
@@ -289,10 +447,14 @@ async def cleanup(paths: List[str]):
 
 @app.get("/health")
 async def health():
+    provider_name = "Groq" if ocr_mode == "groq" else "Google Gemini"
+    api_connected = (groq_client is not None) if ocr_mode == "groq" else (gemini_model is not None)
+    
     return {
         "status": "healthy",
-        "api_connected": gemini_model is not None,
-        "provider": "Google Gemini (Native SDK)",
+        "ocr_mode": ocr_mode,
+        "api_connected": api_connected,
+        "provider": provider_name,
         "pdf_enabled": PDF_SUPPORT,
         "supported_formats": ["jpg", "jpeg", "png", "bmp", "webp"] + 
                            (["pdf"] if PDF_SUPPORT else [])
@@ -303,13 +465,26 @@ async def health():
 async def process_invoice(
     files: List[UploadFile] = File(..., description="Upload PDF or image files")
 ):
+    start_time = time.time()
+    
     if not files:
         raise HTTPException(400, "No files uploaded")
 
-    if not gemini_model:
+    # Check if API is available based on mode
+    if ocr_mode == "groq" and not groq_client:
         raise HTTPException(
             503,
-            "Gemini API not available. Set GEMINI_API_KEY or OPENAI_API_KEY in .env"
+            "Groq API not available. Set GROQ_API_KEY in .env"
+        )
+    elif ocr_mode == "gemini" and not gemini_model:
+        raise HTTPException(
+            503,
+            "Gemini API not available. Set GEMINI_API_KEY in .env"
+        )
+    elif ocr_mode not in ["groq", "gemini"]:
+        raise HTTPException(
+            503,
+            f"Invalid OCR_MODE '{ocr_mode}'. Set OCR_MODE to 'gemini' or 'groq' in .env"
         )
 
     temp_files = []
@@ -359,7 +534,8 @@ async def process_invoice(
                     temp_files.append(tmp.name)
                     image_paths.append(tmp.name)
 
-        print(f"Processing {len(image_paths)} image(s) with Gemini...")
+        provider = "Groq" if ocr_mode == "groq" else "Gemini"
+        print(f"Processing {len(image_paths)} image(s) with {provider}...")
 
         results = await asyncio.gather(
             *[process_single_image(p) for p in image_paths]
@@ -387,7 +563,12 @@ async def process_invoice(
                 if results[0].get(field) is None:
                     merged[field] = None
         
-        print("Processing complete")
+        # Calculate processing time
+        end_time = time.time()
+        processing_time = round(end_time - start_time, 2)
+        merged["processing_time_seconds"] = processing_time
+        
+        print(f"Processing complete in {processing_time}s")
         return InvoiceResponse(**merged)
 
     except HTTPException:

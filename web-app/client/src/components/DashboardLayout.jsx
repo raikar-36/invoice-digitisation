@@ -2,13 +2,48 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { 
+  FileText, 
+  ClipboardCheck, 
+  CheckCircle2, 
+  Upload, 
+  BarChart3, 
+  Users, 
+  FileSearch, 
+  LogOut,
+  Moon,
+  Sun
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 const DashboardLayout = () => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const location = useLocation();
 
   const isActive = (path) => location.pathname === `/dashboard${path}` || (path === '' && location.pathname === '/dashboard');
+
+  // Icon mapping
+  const iconMap = {
+    '📋': FileText,
+    '✏️': ClipboardCheck,
+    '✅': CheckCircle2,
+    '📤': Upload,
+    '📊': BarChart3,
+    '👥': Users,
+    '📜': FileSearch,
+  };
 
   const navLinks = {
     OWNER: [
@@ -16,7 +51,7 @@ const DashboardLayout = () => {
       { path: '/review', label: 'Review Queue', icon: '✏️' },
       { path: '/approve', label: 'Approve Queue', icon: '✅' },
       { path: '/upload', label: 'Upload Invoice', icon: '📤' },
-      { path: '/reports', label: 'Reports', icon: '📊' },
+      { path: '/insights', label: 'Insights', icon: '📊' },
       { path: '/users', label: 'Users', icon: '👥' },
       { path: '/audit', label: 'Audit Log', icon: '📜' }
     ],
@@ -27,77 +62,129 @@ const DashboardLayout = () => {
     ],
     ACCOUNTANT: [
       { path: '', label: 'Approved Invoices', icon: '📋' },
-      { path: '/reports', label: 'Reports', icon: '📊' }
+      { path: '/insights', label: 'Insights', icon: '📊' }
     ]
   };
 
   const links = navLinks[user?.role] || [];
+  
+  // Get user initials
+  const getUserInitials = (name) => {
+    return name
+      ?.split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'U';
+  };
+
+  // Get role badge variant
+  const getRoleBadgeVariant = (role) => {
+    switch (role) {
+      case 'OWNER':
+        return 'default';
+      case 'STAFF':
+        return 'secondary';
+      case 'ACCOUNTANT':
+        return 'outline';
+      default:
+        return 'secondary';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      {/* Top Navigation */}
-      <nav className="bg-white dark:bg-gray-800 shadow-md border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">📄 Smart Invoice</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={toggleTheme}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              >
-                {isDark ? (
-                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                  </svg>
-                )}
-              </motion.button>
-              
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{user?.role}</p>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={logout}
-                className="btn-secondary text-sm"
-              >
-                Logout
-              </motion.button>
-            </div>
+    <div className="min-h-screen bg-background">
+      {/* Top Navigation with Glassmorphism */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center px-4">
+          <div className="flex items-center gap-2 mr-8">
+            <FileText className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold tracking-tight">Smart Invoice</span>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-4">
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDark ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+
+            <Separator orientation="vertical" className="h-8" />
+
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 gap-2 px-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                      {getUserInitials(user?.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col items-start text-left">
+                    <span className="text-sm font-medium">{user?.name}</span>
+                    <span className="text-xs text-muted-foreground">{user?.role}</span>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-      </nav>
+      </header>
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-white dark:bg-gray-800 min-h-screen shadow-lg border-r border-gray-200 dark:border-gray-700">
-          <nav className="p-4 space-y-2">
-            {links.map((link) => (
-              <Link key={link.path} to={`/dashboard${link.path}`}>
-                <motion.div
-                  whileHover={{ x: 4 }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-150 ${
-                    isActive(link.path)
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <span className="text-xl">{link.icon}</span>
-                  <span className="font-medium">{link.label}</span>
-                </motion.div>
-              </Link>
-            ))}
+        <aside className="w-64 min-h-[calc(100vh-4rem)] border-r bg-muted/40">
+          <nav className="flex flex-col gap-2 p-4">
+            {links.map((link) => {
+              const Icon = iconMap[link.icon];
+              const active = isActive(link.path);
+              
+              return (
+                <Link key={link.path} to={`/dashboard${link.path}`}>
+                  <Button
+                    variant={active ? 'default' : 'ghost'}
+                    className={`w-full justify-start gap-3 ${
+                      active ? '' : 'hover:bg-accent'
+                    }`}
+                  >
+                    {Icon && <Icon className="h-4 w-4" />}
+                    <span className="font-medium">{link.label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
           </nav>
+          
+          {/* Role Badge in Sidebar */}
+          <div className="px-4 pb-4 mt-auto">
+            <Separator className="mb-4" />
+            <Badge variant={getRoleBadgeVariant(user?.role)} className="w-full justify-center py-1">
+              {user?.role} ACCESS
+            </Badge>
+          </div>
         </aside>
 
         {/* Main Content */}

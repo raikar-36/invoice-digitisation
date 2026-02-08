@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from './components/ui/sonner';
 import Login from './pages/Login';
 import DashboardLayout from './components/DashboardLayout';
 import UploadInvoice from './pages/UploadInvoice';
@@ -10,7 +11,7 @@ import InvoiceDetail from './pages/InvoiceDetail';
 import ReviewInvoices from './pages/ReviewInvoices';
 import ReviewInvoiceDetail from './pages/ReviewInvoiceDetail';
 import ApproveInvoices from './pages/ApproveInvoices';
-import Reports from './pages/Reports';
+import Insights from './pages/Insights';
 import UserManagement from './pages/UserManagement';
 import AuditLog from './pages/AuditLog';
 
@@ -19,8 +20,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
       </div>
     );
   }
@@ -59,27 +60,27 @@ const AppRoutes = () => {
         <Route path="invoices/:id" element={<InvoiceDetail />} />
         
         {/* Owner and Staff routes */}
-        {(user.role === 'OWNER' || user.role === 'STAFF') && (
+        {(user.role === 'OWNER' || user.role === 'STAFF') ? (
           <>
             <Route path="upload" element={<UploadInvoice />} />
             <Route path="review" element={<ReviewInvoices />} />
             <Route path="review/:id" element={<ReviewInvoiceDetail />} />
           </>
-        )}
+        ) : null}
         
         {/* Owner only routes */}
-        {user.role === 'OWNER' && (
+        {user.role === 'OWNER' ? (
           <>
             <Route path="approve" element={<ApproveInvoices />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="audit" element={<AuditLog />} />
           </>
-        )}
+        ) : null}
         
-        {/* Reporting available to Owner and Accountant */}
-        {(user.role === 'OWNER' || user.role === 'ACCOUNTANT') && (
-          <Route path="reports" element={<Reports />} />
-        )}
+        {/* Insights available to Owner and Accountant */}
+        {(user.role === 'OWNER' || user.role === 'ACCOUNTANT') ? (
+          <Route path="insights" element={<Insights />} />
+        ) : null}
         
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
@@ -94,15 +95,7 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Toaster 
-            position="bottom-center"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                marginBottom: '80px',
-              },
-            }}
-          />
+          <Toaster richColors position="top-right" />
           <AppRoutes />
         </AuthProvider>
       </ThemeProvider>

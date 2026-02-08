@@ -1,30 +1,45 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { User, DollarSign, Trash2, FileText, Inbox, Loader2 } from 'lucide-react';
 import { invoiceAPI, authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { showToast, confirmAction } from '../utils/toast';
+import { formatDate } from '../utils/dateFormatter';
 import PasswordConfirmModal from '../components/PasswordConfirmModal';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 const StatusBadge = ({ status }) => {
-  const colors = {
-    PENDING_REVIEW: 'bg-pending-review text-white',
-    PENDING_APPROVAL: 'bg-pending-approval text-white',
-    APPROVED: 'bg-approved text-white',
-    REJECTED: 'bg-rejected text-white'
+  const statusConfig = {
+    PENDING_REVIEW: {
+      label: 'Pending Review',
+      className: 'bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
+    },
+    PENDING_APPROVAL: {
+      label: 'Pending Approval',
+      className: 'bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+    },
+    APPROVED: {
+      label: 'Approved',
+      className: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100/80 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+    },
+    REJECTED: {
+      label: 'Rejected',
+      className: 'bg-rose-100 text-rose-700 hover:bg-rose-100/80 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800'
+    }
   };
 
-  const labels = {
-    PENDING_REVIEW: 'Pending Review',
-    PENDING_APPROVAL: 'Pending Approval',
-    APPROVED: 'Approved',
-    REJECTED: 'Rejected'
-  };
+  const config = statusConfig[status] || statusConfig.PENDING_REVIEW;
 
   return (
-    <span className={`status-badge ${colors[status]}`}>
-      {labels[status]}
-    </span>
+    <Badge className={config.className}>
+      {config.label}
+    </Badge>
   );
 };
 
@@ -115,7 +130,7 @@ const handleDeleteClick = (e, invoice) => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-500 animate-spin" />
       </div>
     );
   }
@@ -123,60 +138,72 @@ const handleDeleteClick = (e, invoice) => {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Invoices</h1>
+        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Invoices</h1>
       </div>
 
       {/* Filters */}
-      <div className="card mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input
-            type="text"
-            placeholder="Search invoice or customer..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            className="input-field"
-          />
-          
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="select-field"
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING_REVIEW">Pending Review</option>
-            <option value="PENDING_APPROVAL">Pending Approval</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Input
+                type="text"
+                placeholder="Search invoice or customer..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <Select value={filters.status || "ALL"} onValueChange={(value) => handleFilterChange('status', value === "ALL" ? "" : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Statuses</SelectItem>
+                  <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
+                  <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <input
-            type="date"
-            placeholder="From Date"
-            value={filters.dateFrom}
-            onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-            className="input-field"
-          />
+            <div className="relative">
+              <Label htmlFor="dateFrom" className="absolute -top-2 left-2 bg-background px-1 text-xs font-medium z-10">From</Label>
+              <Input
+                id="dateFrom"
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+              />
+            </div>
 
-          <input
-            type="date"
-            placeholder="To Date"
-            value={filters.dateTo}
-            onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-            className="input-field"
-          />
-        </div>
-      </div>
+            <div className="relative">
+              <Label htmlFor="dateTo" className="absolute -top-2 left-2 bg-background px-1 text-xs font-medium z-10">To</Label>
+              <Input
+                id="dateTo"
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Invoice Grid */}
       {invoices.length === 0 ? (
-        <div className="card text-center py-12">
-          <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No invoices found</h3>
-          <p className="text-gray-600 dark:text-gray-400">Try adjusting your filters or upload a new invoice</p>
-        </div>
+        <Card className="text-center py-12">
+          <CardContent className="pt-6">
+            <Inbox className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-semibold mb-2">No invoices found</h3>
+            <p className="text-sm text-muted-foreground">Try adjusting your filters or upload a new invoice</p>
+          </CardContent>
+        </Card>
       ) : (
         <>
-          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mb-4 text-sm text-muted-foreground">
             Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
           </div>
 
@@ -187,54 +214,59 @@ const handleDeleteClick = (e, invoice) => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}
-                  className="card cursor-pointer"
+                  whileHover={{ scale: 1.02 }}
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        {invoice.invoice_number}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(invoice.invoice_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <StatusBadge status={invoice.status} />
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    {invoice.customer_name && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">👤</span>
-                        <span className="text-gray-700 dark:text-gray-300">{invoice.customer_name}</span>
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-primary" />
+                          <div>
+                            <h3 className="text-lg font-bold">
+                              {invoice.invoice_number}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {formatDate(invoice.invoice_date)}
+                            </p>
+                          </div>
+                        </div>
+                        <StatusBadge status={invoice.status} />
                       </div>
-                    )}
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500">💰</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-semibold">
-                        ₹{parseFloat(invoice.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Created by {invoice.created_by_name} on{' '}
-                      {new Date(invoice.created_at).toLocaleDateString()}
-                    </div>
-                    
-                    {user?.role === 'OWNER' && (
-                      <button
-                        onClick={(e) => handleDeleteClick(e, invoice)}
-                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                        title="Delete Invoice"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                      <div className="space-y-3 mb-4">
+                        {invoice.customer_name && (
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">{invoice.customer_name}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                          <span className="text-lg font-bold font-mono tabular-nums">
+                            ₹{parseFloat(invoice.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t flex justify-between items-center">
+                        <div className="text-xs text-muted-foreground">
+                          by {invoice.created_by_name}
+                        </div>
+                        
+                        {user?.role === 'OWNER' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => handleDeleteClick(e, invoice)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title="Delete Invoice"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               </Link>
             ))}
@@ -243,23 +275,23 @@ const handleDeleteClick = (e, invoice) => {
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-4 mt-8">
-              <button
+              <Button
+                variant="outline"
                 onClick={goToPrevPage}
                 disabled={currentPage === 1}
-                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ← Previous
-              </button>
-              <span className="text-gray-700 font-medium">
+              </Button>
+              <span className="font-medium">
                 Page {currentPage} of {totalPages}
               </span>
-              <button
+              <Button
+                variant="outline"
                 onClick={goToNextPage}
                 disabled={currentPage === totalPages}
-                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next →
-              </button>
+              </Button>
             </div>
           )}
         </>
