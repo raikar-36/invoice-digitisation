@@ -4,6 +4,7 @@ const ocrService = require('../services/ocr.service');
 const auditService = require('../services/audit.service');
 const { normalizePhone } = require('../utils/phoneNormalizer');
 const { normalizeDate } = require('../utils/dateNormalizer');
+const { invalidateAnalyticsCache } = require('../utils/cacheManager');
 const PDFDocument = require('pdfkit');
 
 // Validation helper
@@ -652,6 +653,9 @@ exports.submitForApproval = async (req, res) => {
       }
     });
 
+    // Invalidate analytics cache (new submitted invoices affect pending counts)
+    invalidateAnalyticsCache();
+
     res.json({
       success: true,
       message: 'Invoice submitted for approval'
@@ -838,6 +842,9 @@ exports.approveInvoice = async (req, res) => {
         details: { customer_id: customerId }
       });
 
+      // Invalidate analytics cache since invoice data changed
+      invalidateAnalyticsCache();
+
       res.json({
         success: true,
         message: 'Invoice approved successfully'
@@ -907,6 +914,9 @@ exports.rejectInvoice = async (req, res) => {
       action: 'INVOICE_REJECTED',
       details: { reason }
     });
+
+    // Invalidate analytics cache (rejected invoices affect pending counts)
+    invalidateAnalyticsCache();
 
     res.json({
       success: true,

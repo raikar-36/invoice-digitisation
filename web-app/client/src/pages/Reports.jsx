@@ -9,6 +9,7 @@ import {
 const Reports = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState('all');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -84,6 +85,49 @@ const Reports = () => {
     loadAnalytics(dateRange, customStart, customEnd, parseInt(year));
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Add a cache-busting parameter to force fresh data
+      const params = { year: selectedYear, _t: Date.now() };
+      
+      if (customStart && customEnd) {
+        params.startDate = customStart;
+        params.endDate = customEnd;
+      } else if (dateRange !== 'custom' && dateRange !== 'all') {
+        const today = new Date();
+        const daysAgo = parseInt(dateRange);
+        const startDate = new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+        params.startDate = startDate.toISOString().split('T')[0];
+        params.endDate = today.toISOString().split('T')[0];
+      }
+
+      const response = await axios.get('/api/reports/analytics', { 
+        params,
+        withCredentials: true 
+      });
+      
+      if (response.data.success) {
+        const processedData = {
+          ...response.data.data,
+          topCustomersByCount: response.data.data.topCustomersByCount?.map(item => ({
+            ...item,
+            value: parseInt(item.value)
+          })) || [],
+          topCustomersByRevenue: response.data.data.topCustomersByRevenue?.map(item => ({
+            ...item,
+            value: parseFloat(item.value)
+          })) || []
+        };
+        setData(processedData);
+      }
+    } catch (error) {
+      console.error('Failed to refresh analytics:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Generate year options (last 5 years)
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -110,9 +154,31 @@ const Reports = () => {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Analytics Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400">Comprehensive business insights and metrics</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Analytics Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400">Comprehensive business insights and metrics</p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="btn-primary flex items-center gap-2"
+        >
+          <svg 
+            className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+            />
+          </svg>
+          {refreshing ? 'Refreshing...' : 'Refresh Data'}
+        </button>
       </div>
 
       {/* Filters */}

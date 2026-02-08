@@ -1,8 +1,7 @@
 const { getPostgresPool } = require('../config/database');
-const NodeCache = require('node-cache');
+const { cache, invalidateAnalyticsCache, getCacheStats } = require('../utils/cacheManager');
 
-// Initialize cache with TTL of 5 minutes for regular data and 10 minutes for yearly data
-const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+// Cache is now managed by cacheManager utility
 
 // Comprehensive Analytics Endpoint
 exports.getAnalytics = async (req, res) => {
@@ -465,6 +464,45 @@ exports.getStatusDistribution = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get status distribution'
+    });
+  }
+};
+
+// Cache Management Endpoints
+exports.clearCache = async (req, res) => {
+  try {
+    invalidateAnalyticsCache();
+    res.json({
+      success: true,
+      message: 'Analytics cache cleared successfully'
+    });
+  } catch (error) {
+    console.error('Clear cache error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear cache'
+    });
+  }
+};
+
+exports.getCacheStats = async (req, res) => {
+  try {
+    const stats = getCacheStats();
+    const keys = cache.keys();
+    
+    res.json({
+      success: true,
+      stats: {
+        ...stats,
+        totalKeys: keys.length,
+        keys: keys
+      }
+    });
+  } catch (error) {
+    console.error('Get cache stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get cache stats'
     });
   }
 };

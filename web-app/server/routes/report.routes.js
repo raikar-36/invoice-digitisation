@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/report.controller');
-const { authenticate } = require('../middleware/auth.middleware');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 router.use(authenticate);
 
@@ -25,5 +25,9 @@ router.get('/weekly-pattern', reportController.getWeeklyPattern);
 
 // Status distribution
 router.get('/status-distribution', reportController.getStatusDistribution);
+
+// Cache management endpoints (OWNER only)
+router.post('/cache/clear', authorize(['OWNER']), reportController.clearCache);
+router.get('/cache/stats', authorize(['OWNER']), reportController.getCacheStats);
 
 module.exports = router;
