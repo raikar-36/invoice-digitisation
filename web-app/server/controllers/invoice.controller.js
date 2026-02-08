@@ -514,6 +514,34 @@ exports.updateInvoice = async (req, res) => {
       ]
     );
 
+    // Update MongoDB OCR data if customer or items are provided
+    if (updateData.customer || updateData.items) {
+      const ocrData = await documentService.getOcrData(id);
+      if (ocrData) {
+        const updatedOcrJson = {
+          ...ocrData.normalized_ocr_json,
+          invoice: {
+            ...(ocrData.normalized_ocr_json?.invoice || {}),
+            invoice_number: updateData.invoice_number,
+            invoice_date: updateData.invoice_date,
+            total_amount: updateData.total_amount,
+            tax_amount: updateData.tax_amount,
+            discount_amount: updateData.discount_amount
+          }
+        };
+
+        if (updateData.customer) {
+          updatedOcrJson.customer = updateData.customer;
+        }
+
+        if (updateData.items) {
+          updatedOcrJson.items = updateData.items;
+        }
+
+        await documentService.updateOcrData(id, updatedOcrJson);
+      }
+    }
+
     // Log audit
     await auditService.log({
       invoiceId: id,
@@ -797,6 +825,7 @@ exports.approveInvoice = async (req, res) => {
         const productName = item.name || item.description; // Use description as fallback
         
         if (productName) {
+          // Check for product by name only
           const productResult = await client.query(
             'SELECT id FROM products WHERE name = $1',
             [productName]
@@ -1434,6 +1463,109 @@ exports.matchCustomer = async (req, res) => {
       success: false,
       message: 'Failed to match customer',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Feature 3: Check for duplicate invoices
+exports.checkDuplicateInvoice = async (req, res) => {
+  try {
+    const { customer_id, total_amount, invoice_date, invoice_number } = req.body;
+    const pool = getPostgresPool();
+
+    if (!customer_id || !total_amount || !invoice_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer ID, total amount, and invoice date are required'
+      });
+    }
+
+    // Calculate date range (±30 days)
+    const selectedDate = new Date(invoice_date);
+    const startDate = new Date(selectedDate);
+    startDate.setDate(startDate.getDate() - 30);
+    const endDate = new Date(selectedDate);
+    endDate.setDate(endDate.getDate() + 30);
+
+    // Build query for duplicate detection
+    let query = `
+      SELECT i.*, c.name as customer_name
+      FROM invoices i
+      JOIN customers c ON i.customer_id = c.id
+      WHERE (
+        (i.customer_id = $1 
+         AND i.total_amount = $2 
+         AND i.invoice_date BETWEEN $3 AND $4)
+    `;
+    
+    const params = [customer_id, total_amount, startDate, endDate];
+    
+    // Add invoice number check if provided
+    if (invoice_number && invoice_number.trim() !== '') {
+      query += ` OR (i.invoice_number = $5 AND i.invoice_number IS NOT NULL)`;
+      params.push(invoice_number.trim());
+    }
+    
+    query += `) AND i.status IN ('PENDING_APPROVAL', 'APPROVED') ORDER BY i.invoice_date DESC LIMIT 5`;
+
+    const result = await pool.query(query, params);
+
+    if (result.rows.length > 0) {
+      // Calculate days difference for each match
+      const duplicates = result.rows.map(row => {
+        const invoiceDate = new Date(row.invoice_date);
+        const daysDiff = Math.abs(Math.floor((selectedDate - invoiceDate) / (1000 * 60 * 60 * 24)));
+        
+        return {
+          ...row,
+          days_ago: daysDiff
+        };
+      });
+
+      res.json({
+        success: true,
+        hasDuplicates: true,
+        duplicates
+      });
+    } else {
+      res.json({
+        success: true,
+        hasDuplicates: false,
+        duplicates: []
+      });
+    }
+  } catch (error) {
+    console.error('Check duplicate invoice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check for duplicate invoices',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Feature 3: Log duplicate ignore action in audit log
+exports.logDuplicateIgnored = async (req, res) => {
+  try {
+    const { invoice_id, matched_invoice_id } = req.body;
+    const userId = req.user.userId;
+
+    await auditService.logAction(
+      invoice_id,
+      userId,
+      'DUPLICATE_IGNORED',
+      { matched_invoice_id }
+    );
+
+    res.json({
+      success: true,
+      message: 'Duplicate ignore action logged'
+    });
+  } catch (error) {
+    console.error('Log duplicate ignored error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to log action'
     });
   }
 };

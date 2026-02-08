@@ -44,6 +44,12 @@ router.delete('/:id', authorize('OWNER', 'STAFF'), invoiceController.deleteInvoi
 // Match customer (search for duplicates)
 router.post('/match-customer', authorize('OWNER', 'STAFF'), invoiceController.matchCustomer);
 
+// Check for duplicate invoices
+router.post('/check-duplicate', authorize('OWNER', 'STAFF'), invoiceController.checkDuplicateInvoice);
+
+// Log duplicate ignored action
+router.post('/log-duplicate-ignored', authorize('OWNER', 'STAFF'), invoiceController.logDuplicateIgnored);
+
 // Generate PDF
 router.post('/:id/generate-pdf', authorize('OWNER'), invoiceController.generatePdf);
 

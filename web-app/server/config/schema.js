@@ -50,7 +50,7 @@ const createTables = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL UNIQUE,
+        name VARCHAR(255) NOT NULL,
         sku VARCHAR(100),
         hsn VARCHAR(20),
         standard_price DECIMAL(10,2),

@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { invoiceAPI, customerAPI } from '../services/api';
+import { invoiceAPI, customerAPI, productAPI } from '../services/api';
 import CustomerMatchCard from '../components/CustomerMatchCard';
 import CustomerSuggestions from '../components/CustomerSuggestions';
+import ProductAutoComplete from '../components/ProductAutoComplete';
+import SimilarProductsModal from '../components/SimilarProductsModal';
+import DuplicateInvoiceAlert from '../components/DuplicateInvoiceAlert';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,11 +18,14 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Loader2, AlertTriangle, Package, Plus, Minus } from 'lucide-react';
 
 // Custom NumberInput component with stepper buttons
-const NumberInput = ({ value, onChange, step = "1", placeholder, className, id, ...props }) => {
+const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, className, id, ...props }, ref) => {
   const inputRef = useRef(null);
+  
+  // Use forwarded ref or internal ref
+  const actualRef = ref || inputRef;
 
   useEffect(() => {
-    const input = inputRef.current;
+    const input = actualRef.current;
     if (!input) return;
 
     const handleWheel = (e) => {
@@ -28,7 +34,7 @@ const NumberInput = ({ value, onChange, step = "1", placeholder, className, id, 
 
     input.addEventListener('wheel', handleWheel, { passive: false });
     return () => input.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [actualRef]);
 
   const increment = () => {
     const currentValue = parseFloat(value) || 0;
@@ -47,7 +53,7 @@ const NumberInput = ({ value, onChange, step = "1", placeholder, className, id, 
   return (
     <div className="relative">
       <Input
-        ref={inputRef}
+        ref={actualRef}
         id={id}
         type="number"
         step={step}
@@ -81,7 +87,9 @@ const NumberInput = ({ value, onChange, step = "1", placeholder, className, id, 
       </div>
     </div>
   );
-};
+});
+
+NumberInput.displayName = 'NumberInput';
 
 const ReviewInvoiceDetail = () => {
   const { id } = useParams();
@@ -113,6 +121,17 @@ const ReviewInvoiceDetail = () => {
   const [customerSelection, setCustomerSelection] = useState('existing'); // 'existing' or 'different'
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const searchTimeoutRef = useRef(null);
+
+  // Feature 2: Similar products modal state
+  const [showSimilarProductsModal, setShowSimilarProductsModal] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [pendingProductName, setPendingProductName] = useState('');
+  const [pendingProductItemIndex, setPendingProductItemIndex] = useState(null);
+
+  // Feature 3: Duplicate invoice detection state
+  const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
+  const [duplicateInvoices, setDuplicateInvoices] = useState([]);
+  const [pendingSubmissionData, setPendingSubmissionData] = useState(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -328,6 +347,119 @@ const ReviewInvoiceDetail = () => {
     }
   };
 
+  // Feature 1: Handle product selection from autocomplete
+  const handleProductSelect = (index, product) => {
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      newItems[index] = {
+        ...newItems[index],
+        description: product.name,
+        unit_price: product.standard_price || newItems[index].unit_price,
+        product_id: product.id
+      };
+      
+      // Auto-calculate line total if quantity exists
+      const qty = parseFloat(newItems[index].quantity) || 0;
+      const price = parseFloat(product.standard_price || newItems[index].unit_price) || 0;
+      if (qty > 0 && price > 0) {
+        newItems[index].line_total = (qty * price).toFixed(2);
+      }
+      
+      return { ...prev, items: newItems };
+    });
+  };
+
+  // Handle normal item description change (without product selection)
+  const handleItemDescriptionChange = (index, value) => {
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      newItems[index] = {
+        ...newItems[index],
+        description: value,
+        // Clear product_id when user manually edits
+        product_id: null
+      };
+      return { ...prev, items: newItems };
+    });
+    
+    // Clear field error
+    const errorKey = `items[${index}].description`;
+    if (fieldErrors[errorKey]) {
+      setFieldErrors(prev => ({ ...prev, [errorKey]: null }));
+    }
+  };
+
+  // Feature 2: Handle create new product request
+  const handleCreateNewProduct = async (index, productName) => {
+    try {
+      // Check for similar products
+      const response = await productAPI.findSimilar(productName);
+      const similar = response.data.similarProducts || [];
+      
+      if (similar.length > 0) {
+        // Show modal with similar products
+        setSimilarProducts(similar);
+        setPendingProductName(productName);
+        setPendingProductItemIndex(index);
+        setShowSimilarProductsModal(true);
+      } else {
+        // No similar products, just use the name (product will be created during approval)
+        setFormData(prev => {
+          const newItems = [...prev.items];
+          newItems[index] = {
+            ...newItems[index],
+            description: productName
+          };
+          return { ...prev, items: newItems };
+        });
+      }
+    } catch (error) {
+      console.error('Error checking similar products:', error);
+      // Fallback: just use the product name
+      setFormData(prev => {
+        const newItems = [...prev.items];
+        newItems[index] = {
+          ...newItems[index],
+          description: productName
+        };
+        return { ...prev, items: newItems };
+      });
+    }
+  };
+
+  // Feature 2: Create new product - REMOVED, products created during approval
+  // This function is no longer needed as products are created by backend during approval
+
+  // Feature 2: Handle using existing product from modal
+  const handleUseExistingProduct = (product) => {
+    if (pendingProductItemIndex !== null) {
+      handleProductSelect(pendingProductItemIndex, product);
+    }
+    setShowSimilarProductsModal(false);
+    setSimilarProducts([]);
+    setPendingProductName('');
+    setPendingProductItemIndex(null);
+  };
+
+  // Feature 2: Handle creating new product anyway from modal
+  const handleCreateNewProductAnyway = () => {
+    // Just use the product name, product will be created during approval
+    if (pendingProductItemIndex !== null && pendingProductName) {
+      setFormData(prev => {
+        const newItems = [...prev.items];
+        newItems[pendingProductItemIndex] = {
+          ...newItems[pendingProductItemIndex],
+          description: pendingProductName
+        };
+        return { ...prev, items: newItems };
+      });
+    }
+    setShowSimilarProductsModal(false);
+    setSimilarProducts([]);
+    setPendingProductName('');
+    setPendingProductItemIndex(null);
+  };
+
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
@@ -353,13 +485,34 @@ const ReviewInvoiceDetail = () => {
       setSaving(true);
       setError('');
       
+      // Prepare customer data
+      const customerData = {
+        name: formData.customer_name,
+        phone: formData.customer_phone,
+        email: formData.customer_email,
+        gstin: formData.customer_gstin,
+        address: formData.customer_address
+      };
+
+      // Prepare items data
+      const itemsData = formData.items.map(item => ({
+        name: item.name,
+        description: item.description,
+        quantity: parseFloat(item.quantity) || 0,
+        unit_price: parseFloat(item.unit_price) || 0,
+        tax_percentage: parseFloat(item.tax_percentage) || 0,
+        line_total: parseFloat(item.line_total) || 0
+      }));
+      
       await invoiceAPI.update(id, {
         invoice_number: formData.invoice_number,
         invoice_date: formData.invoice_date,
         total_amount: parseFloat(formData.total_amount) || 0,
         tax_amount: parseFloat(formData.tax_amount) || 0,
         discount_amount: parseFloat(formData.discount_amount) || 0,
-        currency: formData.currency
+        currency: formData.currency,
+        customer: customerData,
+        items: itemsData
       });
 
       setSuccess('Draft saved successfully!');
@@ -403,6 +556,7 @@ const ReviewInvoiceDetail = () => {
 
       if (formData.items.length === 0) {
         setError('At least one line item is required');
+        setSubmitting(false);
         return;
       }
       
@@ -445,6 +599,7 @@ const ReviewInvoiceDetail = () => {
           targetRef.current.focus();
         }
         
+        setSubmitting(false);
         return;
       }
 
@@ -477,12 +632,36 @@ const ReviewInvoiceDetail = () => {
         existingCustomerId: (matchType === 'exact' && customerSelection === 'existing') ? matchedCustomer?.id : null
       };
 
-      await invoiceAPI.submit(id, submissionData);
-      
-      setSuccess('Invoice submitted for approval!');
-      setTimeout(() => {
-        navigate('/dashboard/review');
-      }, 1500);
+      // Feature 3: Check for duplicate invoices before submission
+      try {
+        const customerId = matchedCustomer?.id || null;
+        const duplicateCheckData = {
+          customer_id: customerId,
+          total_amount: parseFloat(formData.total_amount),
+          invoice_date: formData.invoice_date,
+          invoice_number: formData.invoice_number
+        };
+
+        // Only check if we have a customer (existing or will be created)
+        if (customerId) {
+          const duplicateResponse = await invoiceAPI.checkDuplicate(duplicateCheckData);
+          
+          if (duplicateResponse.data.hasDuplicates && duplicateResponse.data.duplicates.length > 0) {
+            // Store submission data and show alert
+            setPendingSubmissionData(submissionData);
+            setDuplicateInvoices(duplicateResponse.data.duplicates);
+            setShowDuplicateAlert(true);
+            setSubmitting(false);
+            return;
+          }
+        }
+      } catch (duplicateError) {
+        console.error('Duplicate check error:', duplicateError);
+        // Continue with submission even if duplicate check fails
+      }
+
+      // No duplicates, proceed with submission
+      await performSubmission(submissionData);
     } catch (err) {
       console.error('Submission error:', err);
       
@@ -499,9 +678,68 @@ const ReviewInvoiceDetail = () => {
       } else {
         setError('Failed to submit invoice');
       }
-    } finally {
       setSubmitting(false);
     }
+  };
+
+  // Feature 3: Perform actual submission
+  const performSubmission = async (submissionData) => {
+    try {
+      setSubmitting(true);
+      await invoiceAPI.submit(id, submissionData);
+      
+      setSuccess('Invoice submitted for approval!');
+      setTimeout(() => {
+        navigate('/dashboard/review');
+      }, 1500);
+    } catch (err) {
+      console.error('Submission error:', err);
+      
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        setFieldErrors(errors);
+        const errorCount = Object.keys(errors).length;
+        setError(`Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} highlighted below`);
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Failed to submit invoice');
+      }
+      setSubmitting(false);
+    }
+  };
+
+  // Feature 3: Handle duplicate alert cancel
+  const handleDuplicateCancel = () => {
+    setShowDuplicateAlert(false);
+    setDuplicateInvoices([]);
+    setPendingSubmissionData(null);
+  };
+
+  // Feature 3: Handle duplicate alert proceed
+  const handleDuplicateProceed = async () => {
+    setShowDuplicateAlert(false);
+    
+    // Log the duplicate ignore action
+    try {
+      if (duplicateInvoices.length > 0) {
+        await invoiceAPI.logDuplicateIgnored({
+          invoice_id: id,
+          matched_invoice_id: duplicateInvoices[0].id
+        });
+      }
+    } catch (logError) {
+      console.error('Failed to log duplicate ignore:', logError);
+      // Continue with submission even if logging fails
+    }
+    
+    // Proceed with submission
+    if (pendingSubmissionData) {
+      await performSubmission(pendingSubmissionData);
+    }
+    
+    setDuplicateInvoices([]);
+    setPendingSubmissionData(null);
   };
 
   if (loading) {
@@ -923,14 +1161,16 @@ const ReviewInvoiceDetail = () => {
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div className="col-span-2 space-y-2">
-                            <Label htmlFor={`item_description_${index}`}>Description</Label>
-                            <Input
-                              id={`item_description_${index}`}
-                              type="text"
+                            <Label htmlFor={`item_description_${index}`}>
+                              Item Name / Description
+                            </Label>
+                            <ProductAutoComplete
                               value={item.description}
-                              onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                              onChange={(value) => handleItemDescriptionChange(index, value)}
+                              onProductSelect={(product) => handleProductSelect(index, product)}
+                              onCreateNew={(productName) => handleCreateNewProduct(index, productName)}
+                              placeholder="Type product name..."
                               className={fieldErrors[`items[${index}].description`] ? 'border-destructive' : ''}
-                              placeholder="Product name"
                             />
                             {fieldErrors[`items[${index}].description`] && (
                               <p className="text-destructive text-xs flex items-center gap-1">
@@ -1025,6 +1265,25 @@ const ReviewInvoiceDetail = () => {
           </Card>
         </div>
       </div>
+
+      {/* Feature 2: Similar Products Modal */}
+      <SimilarProductsModal
+        open={showSimilarProductsModal}
+        onOpenChange={setShowSimilarProductsModal}
+        newProductName={pendingProductName}
+        similarProducts={similarProducts}
+        onUseExisting={handleUseExistingProduct}
+        onCreateNew={handleCreateNewProductAnyway}
+      />
+
+      {/* Feature 3: Duplicate Invoice Alert */}
+      <DuplicateInvoiceAlert
+        open={showDuplicateAlert}
+        onOpenChange={setShowDuplicateAlert}
+        duplicates={duplicateInvoices}
+        onCancel={handleDuplicateCancel}
+        onProceed={handleDuplicateProceed}
+      />
     </div>
   );
 };

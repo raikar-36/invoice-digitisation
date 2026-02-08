@@ -42,7 +42,9 @@ export const invoiceAPI = {
   delete: (id) => api.delete(`/invoices/${id}`),
   generatePdf: (id) => api.post(`/invoices/${id}/generate-pdf`),
   downloadDocument: (invoiceId, documentId) => 
-    api.get(`/invoices/${invoiceId}/documents/${documentId}`, { responseType: 'blob' })
+    api.get(`/invoices/${invoiceId}/documents/${documentId}`, { responseType: 'blob' }),
+  checkDuplicate: (data) => api.post('/invoices/check-duplicate', data),
+  logDuplicateIgnored: (data) => api.post('/invoices/log-duplicate-ignored', data)
 };
 
 // Customer endpoints
@@ -55,7 +57,11 @@ export const customerAPI = {
 // Product endpoints
 export const productAPI = {
   getAll: () => api.get('/products'),
-  getById: (id) => api.get(`/products/${id}`)
+  getById: (id) => api.get(`/products/${id}`),
+  search: (query) => api.get('/products/search', { params: { q: query } }),
+  getPriceRange: (id) => api.get(`/products/${id}/price-range`),
+  findSimilar: (name) => api.post('/products/find-similar', { name }),
+  create: (data) => api.post('/products', data)
 };
 
 // Report endpoints

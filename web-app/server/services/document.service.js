@@ -132,6 +132,26 @@ exports.getOcrData = async (invoiceId) => {
   }
 };
 
+exports.updateOcrData = async (invoiceId, normalizedOcrJson) => {
+  try {
+    const db = getMongoDb();
+    const collection = db.collection('ocr_data');
+
+    await collection.updateOne(
+      { invoice_id: invoiceId.toString() },
+      {
+        $set: {
+          normalized_ocr_json: normalizedOcrJson,
+          updated_at: new Date()
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Update OCR data error:', error);
+    throw error;
+  }
+};
+
 exports.deleteInvoiceDocuments = async (invoiceId) => {
   try {
     const db = getMongoDb();

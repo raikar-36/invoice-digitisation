@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
 import axios from 'axios';
 import { 
   AreaChart, Area, PieChart, Pie, Cell, Label as RechartsLabel,
@@ -142,7 +143,7 @@ const Insights = () => {
       // Convert to CSV format with UTF-8 BOM for proper encoding
       let csv = '\uFEFF'; // UTF-8 BOM
       csv += 'Smart Invoice Analytics Export\n';
-      csv += `Generated: ${new Date().toLocaleString()}\n\n`;
+      csv += `Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}\n\n`;
       
       // Summary Section
       csv += 'KEY PERFORMANCE INDICATORS\n';

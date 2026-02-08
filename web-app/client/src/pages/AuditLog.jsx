@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
 import { auditAPI, userAPI, invoiceAPI } from '../services/api';
 import { FileSearch, Loader2, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -304,7 +305,7 @@ const AuditLog = () => {
                         className="hover:bg-muted/50 transition-colors"
                       >
                         <TableCell className="text-sm font-mono">
-                          {new Date(log.timestamp).toLocaleString()}
+                          {format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm:ss')}
                         </TableCell>
                         <TableCell className="text-sm">
                           {log.user_name || `User ${log.user_id}`}
