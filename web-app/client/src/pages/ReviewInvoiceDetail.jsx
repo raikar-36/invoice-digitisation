@@ -11,11 +11,89 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Loader2, AlertTriangle, Package, Plus, Minus } from 'lucide-react';
+
+// Custom NumberInput component with stepper buttons
+const NumberInput = ({ value, onChange, step = "1", placeholder, className, id, ...props }) => {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const handleWheel = (e) => {
+      e.preventDefault();
+    };
+
+    input.addEventListener('wheel', handleWheel, { passive: false });
+    return () => input.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  const increment = () => {
+    const currentValue = parseFloat(value) || 0;
+    const stepValue = parseFloat(step);
+    const newValue = (currentValue + stepValue).toFixed(step.includes('.') ? step.split('.')[1].length : 0);
+    onChange({ target: { value: newValue } });
+  };
+
+  const decrement = () => {
+    const currentValue = parseFloat(value) || 0;
+    const stepValue = parseFloat(step);
+    const newValue = Math.max(0, currentValue - stepValue).toFixed(step.includes('.') ? step.split('.')[1].length : 0);
+    onChange({ target: { value: newValue } });
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        ref={inputRef}
+        id={id}
+        type="number"
+        step={step}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`pr-16 ${className}`}
+        {...props}
+      />
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={decrement}
+          tabIndex={-1}
+        >
+          <Minus className="h-3 w-3" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={increment}
+          tabIndex={-1}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const ReviewInvoiceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  
+  // Add refs for auto-scroll
+  const invoiceNumberRef = useRef(null);
+  const invoiceDateRef = useRef(null);
+  const totalAmountRef = useRef(null);
+  const customerNameRef = useRef(null);
+  const customerPhoneRef = useRef(null);
+  const itemRefs = useRef({});
   
   const [invoice, setInvoice] = useState(null);
   const [ocrData, setOcrData] = useState(null);
@@ -172,13 +250,26 @@ const ReviewInvoiceDetail = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
     
     // Clear field error when user starts typing
-    if (fieldErrors[name]) {
-      setFieldErrors(prev => ({ ...prev, [name]: null }));
+    const errorKey = `invoice.${name}` in fieldErrors ? `invoice.${name}` : 
+                     `customer.${name.replace('customer_', '')}` in fieldErrors ? `customer.${name.replace('customer_', '')}` : 
+                     name;
+    if (fieldErrors[errorKey]) {
+      setFieldErrors(prev => ({ ...prev, [errorKey]: null }));
     }
     
     // Reset customer selection when phone changes
     if (name === 'customer_phone' && matchedCustomer) {
       setCustomerSelection('existing');
+    }
+  };
+
+  const handleFieldChange = (fieldName, value) => {
+    setFormData(prev => ({ ...prev, [fieldName]: value }));
+    
+    // Clear field error when user modifies field
+    const errorKey = `invoice.${fieldName}` in fieldErrors ? `invoice.${fieldName}` : fieldName;
+    if (fieldErrors[errorKey]) {
+      setFieldErrors(prev => ({ ...prev, [errorKey]: null }));
     }
   };
 
@@ -287,19 +378,73 @@ const ReviewInvoiceDetail = () => {
       setError('');
       setFieldErrors({});
 
-      // Validate required fields
-      if (!formData.invoice_number || !formData.invoice_date || !formData.total_amount) {
-        setError('Invoice number, date, and amount are required');
-        return;
+      // Validate required fields with specific messages
+      const errors = {};
+      
+      if (!formData.invoice_number) {
+        errors['invoice.invoice_number'] = 'Invoice Number is missing—this is required for tracking.';
+      }
+      
+      if (!formData.invoice_date) {
+        errors['invoice.invoice_date'] = 'Invoice Date is required to process this invoice.';
+      }
+      
+      if (!formData.total_amount) {
+        errors['invoice.total_amount'] = 'Total Amount must be specified.';
       }
 
-      if (!formData.customer_name || !formData.customer_phone) {
-        setError('Customer name and phone are required');
-        return;
+      if (!formData.customer_name) {
+        errors['customer.name'] = 'Customer Name is required to create or link this invoice.';
+      }
+      
+      if (!formData.customer_phone) {
+        errors['customer.phone'] = 'Customer Phone is required for identification.';
       }
 
       if (formData.items.length === 0) {
         setError('At least one line item is required');
+        return;
+      }
+      
+      // Validate line items with row-specific feedback
+      formData.items.forEach((item, index) => {
+        if (!item.description || item.description.trim() === '') {
+          errors[`items[${index}].description`] = `Row ${index + 1}: Item Description cannot be empty.`;
+        }
+        if (!item.quantity || parseFloat(item.quantity) <= 0) {
+          errors[`items[${index}].quantity`] = `Row ${index + 1}: Quantity must be greater than 0.`;
+        }
+        if (!item.unit_price || parseFloat(item.unit_price) <= 0) {
+          errors[`items[${index}].unit_price`] = `Row ${index + 1}: Unit Price must be greater than 0.`;
+        }
+      });
+      
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        const errorCount = Object.keys(errors).length;
+        setError(`Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} highlighted below`);
+        
+        // Auto-scroll to first error
+        const firstErrorKey = Object.keys(errors)[0];
+        let targetRef = null;
+        
+        if (firstErrorKey.includes('invoice_number')) targetRef = invoiceNumberRef;
+        else if (firstErrorKey.includes('invoice_date')) targetRef = invoiceDateRef;
+        else if (firstErrorKey.includes('total_amount')) targetRef = totalAmountRef;
+        else if (firstErrorKey.includes('customer.name')) targetRef = customerNameRef;
+        else if (firstErrorKey.includes('customer.phone')) targetRef = customerPhoneRef;
+        else if (firstErrorKey.includes('items')) {
+          const match = firstErrorKey.match(/items\[(\d+)\]/);
+          if (match) {
+            targetRef = itemRefs.current[match[1]];
+          }
+        }
+        
+        if (targetRef?.current) {
+          targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetRef.current.focus();
+        }
+        
         return;
       }
 
@@ -514,82 +659,89 @@ const ReviewInvoiceDetail = () => {
                       Invoice Number <span className="text-destructive">*</span>
                     </Label>
                     <Input
+                      ref={invoiceNumberRef}
                       id="invoice_number"
                       type="text"
                       name="invoice_number"
                       value={formData.invoice_number}
                       onChange={handleInputChange}
-                      className={fieldErrors['invoice.invoice_number'] ? 'border-destructive' : ''}
+                      className={`font-mono tracking-tighter ${fieldErrors['invoice.invoice_number'] ? 'border-destructive' : ''}`}
                       placeholder="INV-001"
                     />
                     {fieldErrors['invoice.invoice_number'] && (
-                      <p className="text-destructive text-xs">⚠️ {fieldErrors['invoice.invoice_number']}</p>
+                      <p className="text-destructive text-xs flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {fieldErrors['invoice.invoice_number']}
+                      </p>
                     )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="invoice_date">
                       Invoice Date <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      id="invoice_date"
-                      type="date"
-                      name="invoice_date"
-                      value={formData.invoice_date}
-                      onChange={handleInputChange}
-                      className={fieldErrors['invoice.invoice_date'] ? 'border-destructive' : ''}
-                    />
+                    <div ref={invoiceDateRef}>
+                      <DatePicker
+                        value={formData.invoice_date}
+                        onChange={(date) => handleFieldChange('invoice_date', date)}
+                        placeholder="Select invoice date"
+                      />
+                    </div>
                     {fieldErrors['invoice.invoice_date'] && (
-                      <p className="text-destructive text-xs">⚠️ {fieldErrors['invoice.invoice_date']}</p>
+                      <p className="text-destructive text-xs flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {fieldErrors['invoice.invoice_date']}
+                      </p>
                     )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="total_amount">
                       Total Amount <span className="text-destructive">*</span>
                     </Label>
-                    <Input
+                    <NumberInput
+                      ref={totalAmountRef}
                       id="total_amount"
-                      type="number"
                       step="0.01"
                       name="total_amount"
                       value={formData.total_amount}
                       onChange={handleInputChange}
-                      className={`font-mono tabular-nums ${fieldErrors['invoice.total_amount'] ? 'border-destructive' : ''}`}
+                      className={`font-mono tracking-tighter tabular-nums ${fieldErrors['invoice.total_amount'] ? 'border-destructive' : ''}`}
                       placeholder="0.00"
                     />
                     {fieldErrors['invoice.total_amount'] && (
-                      <p className="text-destructive text-xs">⚠️ {fieldErrors['invoice.total_amount']}</p>
+                      <p className="text-destructive text-xs flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {fieldErrors['invoice.total_amount']}
+                      </p>
                     )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="tax_amount">Tax Amount</Label>
-                    <Input
+                    <NumberInput
                       id="tax_amount"
-                      type="number"
                       step="0.01"
                       name="tax_amount"
                       value={formData.tax_amount}
                       onChange={handleInputChange}
-                      className="font-mono tabular-nums"
+                      className="font-mono tracking-tighter tabular-nums"
                       placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="discount_amount">Discount Amount</Label>
-                    <Input
+                    <NumberInput
                       id="discount_amount"
-                      type="number"
                       step="0.01"
                       name="discount_amount"
                       value={formData.discount_amount}
                       onChange={handleInputChange}
-                      className="font-mono tabular-nums"
+                      className="font-mono tracking-tighter tabular-nums"
                       placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Currency</Label>
                     <Select name="currency" value={formData.currency} onValueChange={(value) => handleInputChange({ target: { name: 'currency', value } })}>
-                      <SelectTrigger id="currency">
+                      <SelectTrigger id="currency" className="hover:bg-accent transition-colors">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -604,7 +756,7 @@ const ReviewInvoiceDetail = () => {
 
             {/* Customer Details */}
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Customer Details</h2>
+              <h2 className="text-xl font-semibold tracking-tight mb-4">Customer Details</h2>
               
               {/* Customer Match Card - Exact Match */}
               {matchType === 'exact' && matchedCustomer && (
@@ -625,118 +777,109 @@ const ReviewInvoiceDetail = () => {
 
               {/* Loading Indicator */}
               {searchingCustomer && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                  <span className="text-sm text-blue-700">Searching for existing customer...</span>
-                </div>
+                <Card className="mb-4 bg-blue-500/5 border-border/50">
+                  <CardContent className="py-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span className="text-sm text-muted-foreground">Searching for existing customer...</span>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* New Customer Badge */}
               {matchType === 'none' && !searchingCustomer && formData.customer_phone && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-600 font-semibold">🆕 New Customer</span>
-                    <span className="text-sm text-blue-700">
-                      This will create a new customer record
-                    </span>
-                  </div>
-                </div>
+                <Card className="mb-4 bg-blue-500/5 border-border/50">
+                  <CardContent className="py-3">
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-semibold">New Customer</span>
+                      <span className="text-sm text-muted-foreground">
+                        This will create a new customer record
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Customer Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="customer_name">
+                    Customer Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    ref={customerNameRef}
+                    id="customer_name"
                     type="text"
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleInputChange}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
-                    className={`input-field ${
-                      matchType === 'exact' && customerSelection === 'existing'
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
-                    } ${fieldErrors['customer.name'] ? 'border-red-500 border-2' : ''}`}
+                    className={fieldErrors['customer.name'] ? 'border-destructive' : ''}
                     placeholder="ABC Traders"
                   />
                   {fieldErrors['customer.name'] && (
-                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['customer.name']}</p>
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {fieldErrors['customer.name']}
+                    </p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Phone <span className="text-red-500">*</span>
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="customer_phone">
+                    Phone <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    ref={customerPhoneRef}
+                    id="customer_phone"
                     type="tel"
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleInputChange}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
-                    className={`input-field ${
-                      matchType === 'exact' && customerSelection === 'existing'
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
-                    } ${fieldErrors['customer.phone'] ? 'border-red-500 border-2' : ''}`}
+                    className={fieldErrors['customer.phone'] ? 'border-destructive' : ''}
                     placeholder="+91-9876543210"
                   />
                   {fieldErrors['customer.phone'] && (
-                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['customer.phone']}</p>
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {fieldErrors['customer.phone']}
+                    </p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="customer_email">Email</Label>
+                  <Input
+                    id="customer_email"
                     type="email"
                     name="customer_email"
                     value={formData.customer_email}
                     onChange={handleInputChange}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
-                    className={`input-field ${
-                      matchType === 'exact' && customerSelection === 'existing'
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
-                    }`}
                     placeholder="customer@example.com"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    GSTIN
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="customer_gstin">GSTIN</Label>
+                  <Input
+                    id="customer_gstin"
                     type="text"
                     name="customer_gstin"
                     value={formData.customer_gstin}
                     onChange={handleInputChange}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
-                    className={`input-field ${
-                      matchType === 'exact' && customerSelection === 'existing'
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
-                    }`}
                     placeholder="22AAAAA0000A1Z5"
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Address
-                  </label>
-                  <textarea
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="customer_address">Address</Label>
+                  <Textarea
+                    id="customer_address"
                     name="customer_address"
                     value={formData.customer_address}
                     onChange={handleInputChange}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
-                    className={`input-field ${
-                      matchType === 'exact' && customerSelection === 'existing'
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
-                    }`}
-                    rows="2"
+                    rows={2}
                     placeholder="123 Main St, City, State, ZIP"
                   />
                 </div>
@@ -746,103 +889,115 @@ const ReviewInvoiceDetail = () => {
             {/* Line Items */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Line Items</h2>
-                <button
+                <h2 className="text-xl font-semibold tracking-tight">Line Items</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={addItem}
-                  className="btn-secondary text-sm"
                 >
                   + Add Item
-                </button>
+                </Button>
               </div>
 
               {formData.items.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600">No items added. Click "+ Add Item" to start.</p>
-                </div>
+                <Card className="text-center py-8 bg-muted/50">
+                  <CardContent className="pt-6">
+                    <p className="text-muted-foreground">No items added. Click "+ Add Item" to start.</p>
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="space-y-4">
                   {formData.items.map((item, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <h3 className="font-medium text-gray-700">Item {index + 1}</h3>
-                        <button
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:text-red-700 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                            className={`input-field text-sm ${fieldErrors[`items[${index}].description`] ? 'border-red-500 border-2' : ''}`}
-                            placeholder="Product name"
-                          />
-                          {fieldErrors[`items[${index}].description`] && (
-                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].description`]}</p>
-                          )}
+                    <Card key={index} ref={(el) => (itemRefs.current[index] = el)}>
+                      <CardContent className="pt-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="font-semibold tracking-tight">Item {index + 1}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeItem(index)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            Remove
+                          </Button>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Quantity
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            className={`input-field text-sm ${fieldErrors[`items[${index}].quantity`] ? 'border-red-500 border-2' : ''}`}
-                            placeholder="1"
-                          />
-                          {fieldErrors[`items[${index}].quantity`] && (
-                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].quantity`]}</p>
-                          )}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                          <div className="col-span-2 space-y-2">
+                            <Label htmlFor={`item_description_${index}`}>Description</Label>
+                            <Input
+                              id={`item_description_${index}`}
+                              type="text"
+                              value={item.description}
+                              onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                              className={fieldErrors[`items[${index}].description`] ? 'border-destructive' : ''}
+                              placeholder="Product name"
+                            />
+                            {fieldErrors[`items[${index}].description`] && (
+                              <p className="text-destructive text-xs flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                {fieldErrors[`items[${index}].description`]}
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`item_quantity_${index}`}>Quantity</Label>
+                            <NumberInput
+                              id={`item_quantity_${index}`}
+                              step="1"
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                              className={fieldErrors[`items[${index}].quantity`] ? 'border-destructive' : ''}
+                              placeholder="1"
+                            />
+                            {fieldErrors[`items[${index}].quantity`] && (
+                              <p className="text-destructive text-xs flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                {fieldErrors[`items[${index}].quantity`]}
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`item_unit_price_${index}`}>Unit Price</Label>
+                            <NumberInput
+                              id={`item_unit_price_${index}`}
+                              step="1"
+                              value={item.unit_price}
+                              onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                              className={`font-mono tracking-tighter ${fieldErrors[`items[${index}].unit_price`] ? 'border-destructive' : ''}`}
+                              placeholder="0.00"
+                            />
+                            {fieldErrors[`items[${index}].unit_price`] && (
+                              <p className="text-destructive text-xs flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                {fieldErrors[`items[${index}].unit_price`]}
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`item_tax_percentage_${index}`}>Tax %</Label>
+                            <NumberInput
+                              id={`item_tax_percentage_${index}`}
+                              step="0.01"
+                              value={item.tax_percentage}
+                              onChange={(e) => handleItemChange(index, 'tax_percentage', e.target.value)}
+                              className={fieldErrors[`items[${index}].tax_percentage`] ? 'border-destructive' : ''}
+                              placeholder="0"
+                            />
+                            {fieldErrors[`items[${index}].tax_percentage`] && (
+                              <p className="text-destructive text-xs flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                {fieldErrors[`items[${index}].tax_percentage`]}
+                              </p>
+                            )}
+                          </div>
+                          <div className="col-span-2 md:col-span-5 pt-2 border-t">
+                            <Label className="text-muted-foreground">
+                              Line Total: <span className="text-primary font-mono tracking-tighter">₹{item.line_total || '0.00'}</span>
+                            </Label>
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Unit Price
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.unit_price}
-                            onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                            className={`input-field text-sm ${fieldErrors[`items[${index}].unit_price`] ? 'border-red-500 border-2' : ''}`}
-                            placeholder="0.00"
-                          />
-                          {fieldErrors[`items[${index}].unit_price`] && (
-                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].unit_price`]}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Tax %
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.tax_percentage}
-                            onChange={(e) => handleItemChange(index, 'tax_percentage', e.target.value)}
-                            className={`input-field text-sm ${fieldErrors[`items[${index}].tax_percentage`] ? 'border-red-500 border-2' : ''}`}
-                            placeholder="0"
-                          />
-                          {fieldErrors[`items[${index}].tax_percentage`] && (
-                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].tax_percentage`]}</p>
-                          )}
-                        </div>
-                        <div className="col-span-2 md:col-span-5">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Line Total: <span className="text-indigo-600">₹{item.line_total || '0.00'}</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               )}

@@ -34,35 +34,24 @@ const DashboardLayout = () => {
 
   const isActive = (path) => location.pathname === `/dashboard${path}` || (path === '' && location.pathname === '/dashboard');
 
-  // Icon mapping
-  const iconMap = {
-    '📋': FileText,
-    '✏️': ClipboardCheck,
-    '✅': CheckCircle2,
-    '📤': Upload,
-    '📊': BarChart3,
-    '👥': Users,
-    '📜': FileSearch,
-  };
-
   const navLinks = {
     OWNER: [
-      { path: '', label: 'All Invoices', icon: '📋' },
-      { path: '/review', label: 'Review Queue', icon: '✏️' },
-      { path: '/approve', label: 'Approve Queue', icon: '✅' },
-      { path: '/upload', label: 'Upload Invoice', icon: '📤' },
-      { path: '/insights', label: 'Insights', icon: '📊' },
-      { path: '/users', label: 'Users', icon: '👥' },
-      { path: '/audit', label: 'Audit Log', icon: '📜' }
+      { path: '', label: 'All Invoices', icon: FileText },
+      { path: '/review', label: 'Review Queue', icon: ClipboardCheck },
+      { path: '/approve', label: 'Approve Queue', icon: CheckCircle2 },
+      { path: '/upload', label: 'Upload Invoice', icon: Upload },
+      { path: '/insights', label: 'Insights', icon: BarChart3 },
+      { path: '/users', label: 'Users', icon: Users },
+      { path: '/audit', label: 'Audit Log', icon: FileSearch }
     ],
     STAFF: [
-      { path: '', label: 'My Invoices', icon: '📋' },
-      { path: '/review', label: 'Review Queue', icon: '✏️' },
-      { path: '/upload', label: 'Upload Invoice', icon: '📤' }
+      { path: '', label: 'My Invoices', icon: FileText },
+      { path: '/review', label: 'Review Queue', icon: ClipboardCheck },
+      { path: '/upload', label: 'Upload Invoice', icon: Upload }
     ],
     ACCOUNTANT: [
-      { path: '', label: 'Approved Invoices', icon: '📋' },
-      { path: '/insights', label: 'Insights', icon: '📊' }
+      { path: '', label: 'Approved Invoices', icon: FileText },
+      { path: '/insights', label: 'Insights', icon: BarChart3 }
     ]
   };
 
@@ -159,7 +148,7 @@ const DashboardLayout = () => {
         <aside className="w-64 min-h-[calc(100vh-4rem)] border-r bg-muted/40">
           <nav className="flex flex-col gap-2 p-4">
             {links.map((link) => {
-              const Icon = iconMap[link.icon];
+              const Icon = link.icon;
               const active = isActive(link.path);
               
               return (
@@ -170,7 +159,7 @@ const DashboardLayout = () => {
                       active ? '' : 'hover:bg-accent'
                     }`}
                   >
-                    {Icon && <Icon className="h-4 w-4" />}
+                    {Icon && <Icon className="h-5 w-5" />}
                     <span className="font-medium">{link.label}</span>
                   </Button>
                 </Link>

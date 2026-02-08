@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { 
-  AreaChart, Area, PieChart, Pie, Cell,
+  AreaChart, Area, PieChart, Pie, Cell, Label as RechartsLabel,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { DatePicker } from '@/components/ui/date-picker';
 import { 
   Loader2, 
   RefreshCw, 
@@ -26,10 +27,10 @@ import {
 } from 'lucide-react';
 
 const STATUS_COLORS = {
-  APPROVED: 'hsl(142 71% 45%)',
-  PENDING_REVIEW: 'hsl(48 96% 53%)',
-  PENDING_APPROVAL: 'hsl(221 83% 53%)',
-  REJECTED: 'hsl(0 84% 60%)'
+  APPROVED: 'hsl(142 71% 45%)',      // Emerald
+  PENDING_REVIEW: 'hsl(43 96% 56%)', // Amber
+  PENDING_APPROVAL: 'hsl(262 83% 58%)', // Purple
+  REJECTED: 'hsl(0 84% 60%)'         // Rose
 };
 
 // Custom Glass Tooltip for Area Chart
@@ -286,22 +287,18 @@ const Insights = () => {
             <div className="flex flex-col md:flex-row gap-4 items-end">
               <div className="flex-1">
                 <Label htmlFor="start-date">From</Label>
-                <Input 
-                  id="start-date"
-                  type="date"
+                <DatePicker
                   value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="mt-1"
+                  onChange={(date) => setCustomStart(date)}
+                  placeholder="Select start date"
                 />
               </div>
               <div className="flex-1">
                 <Label htmlFor="end-date">To</Label>
-                <Input 
-                  id="end-date"
-                  type="date"
+                <DatePicker
                   value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="mt-1"
+                  onChange={(date) => setCustomEnd(date)}
+                  placeholder="Select end date"
                 />
               </div>
               <Button onClick={handleCustomDateApply} disabled={!customStart || !customEnd}>
@@ -319,7 +316,7 @@ const Insights = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="overflow-hidden border-slate-200/60 dark:border-slate-800/60">
+          <Card className="rounded-xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -373,7 +370,7 @@ const Insights = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="overflow-hidden border-slate-200/60 dark:border-slate-800/60">
+          <Card className="rounded-xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -427,7 +424,7 @@ const Insights = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="overflow-hidden border-slate-200/60 dark:border-slate-800/60">
+          <Card className="rounded-xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -481,7 +478,7 @@ const Insights = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className="overflow-hidden border-slate-200/60 dark:border-slate-800/60">
+          <Card className="rounded-xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -627,7 +624,7 @@ const Insights = () => {
       {/* Row 3: Invoice Breakdown + Operational Health */}
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
         {/* Status Donut Chart */}
-        <Card className="col-span-7 lg:col-span-3 relative">
+        <Card className="col-span-7 lg:col-span-3">
           <CardHeader>
             <CardTitle className="text-base">Invoice Status Distribution</CardTitle>
           </CardHeader>
@@ -646,12 +643,28 @@ const Insights = () => {
                   {statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
+                  <RechartsLabel
+                    position="center"
+                    content={({ viewBox }) => {
+                      const { cx, cy } = viewBox;
+                      return (
+                        <g>
+                          <text x={cx} y={cy - 10} textAnchor="middle" dominantBaseline="middle" className="fill-foreground font-mono text-4xl font-bold tracking-tighter">
+                            {totalInvoices}
+                          </text>
+                          <text x={cx} y={cy + 20} textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground text-xs">
+                            Total
+                          </text>
+                        </g>
+                      );
+                    }}
+                  />
                 </Pie>
                 <Tooltip 
                   content={({ payload }) => {
                     if (payload && payload.length) {
                       return (
-                        <div className="bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border shadow-xl rounded-lg p-3">
+                        <div className="bg-popover text-popover-foreground backdrop-blur-md border shadow-xl rounded-lg p-3">
                           <p className="text-sm font-medium">{payload[0].name}</p>
                           <p className="text-lg font-bold">{payload[0].value} invoices</p>
                         </div>
@@ -662,16 +675,6 @@ const Insights = () => {
                 />
               </PieChart>
             </ResponsiveContainer>
-            
-            {/* Center Total - Positioned Absolutely */}
-            <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <p className="text-3xl font-bold font-mono">
-                  {totalInvoices}
-                </p>
-                <p className="text-xs text-muted-foreground">Total</p>
-              </div>
-            </div>
             
             {/* Legend */}
             <div className="grid grid-cols-2 gap-4 mt-4">

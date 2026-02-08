@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis } from '@/components/ui/pagination';
 
 const StatusBadge = ({ status }) => {
   const statusConfig = {
@@ -90,10 +92,37 @@ const InvoiceList = () => {
   const currentInvoices = invoices.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(invoices.length / itemsPerPage);
 
-  const goToNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const generatePageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('ellipsis');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
   };
-const handleDeleteClick = (e, invoice) => {
+
+  const handleDeleteClick = (e, invoice) => {
     e.preventDefault(); // Prevent Link navigation
     e.stopPropagation();
     setInvoiceToDelete(invoice);
@@ -120,11 +149,6 @@ const handleDeleteClick = (e, invoice) => {
     } catch (error) {
       throw error; // Let modal handle the error
     }
-  };
-
-  
-  const goToPrevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
   };
 
   if (loading) {
@@ -171,21 +195,19 @@ const handleDeleteClick = (e, invoice) => {
 
             <div className="relative">
               <Label htmlFor="dateFrom" className="absolute -top-2 left-2 bg-background px-1 text-xs font-medium z-10">From</Label>
-              <Input
-                id="dateFrom"
-                type="date"
+              <DatePicker
                 value={filters.dateFrom}
-                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                onChange={(date) => handleFilterChange('dateFrom', date)}
+                placeholder="From date"
               />
             </div>
 
             <div className="relative">
               <Label htmlFor="dateTo" className="absolute -top-2 left-2 bg-background px-1 text-xs font-medium z-10">To</Label>
-              <Input
-                id="dateTo"
-                type="date"
+              <DatePicker
                 value={filters.dateTo}
-                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                onChange={(date) => handleFilterChange('dateTo', date)}
+                placeholder="To date"
               />
             </div>
           </div>
@@ -274,24 +296,40 @@ const handleDeleteClick = (e, invoice) => {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 mt-8">
-              <Button
-                variant="outline"
-                onClick={goToPrevPage}
-                disabled={currentPage === 1}
-              >
-                ← Previous
-              </Button>
-              <span className="font-medium">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-              >
-                Next →
-              </Button>
+            <div className="mt-8">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  
+                  {generatePageNumbers().map((page, idx) => (
+                    <PaginationItem key={idx}>
+                      {page === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </>

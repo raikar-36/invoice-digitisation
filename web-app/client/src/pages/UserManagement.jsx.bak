@@ -78,10 +78,7 @@ const UserManagement = () => {
   };
 
   const confirmDeactivate = async () => {
-    if (!userToModify) return;
-    
-    try {
-      setDeactivating(true);
+    ifsetDeactivating(true);
       await userAPI.deactivate(userToModify.id);
       loadUsers();
       showToast.success('User deactivated successfully');
@@ -91,7 +88,10 @@ const UserManagement = () => {
       console.error('Failed to deactivate user:', error);
       showToast.error(error.response?.data?.message || 'Failed to deactivate user');
     } finally {
-      setDeactivating(false);
+      setDeactivating(false
+    } catch (error) {
+      console.error('Failed to deactivate user:', error);
+      showToast.error(error.response?.data?.message || 'Failed to deactivate user');
     }
   };
 
@@ -101,10 +101,7 @@ const UserManagement = () => {
   };
 
   const confirmReactivate = async () => {
-    if (!userToModify) return;
-    
-    try {
-      setReactivating(true);
+    ifsetReactivating(true);
       await userAPI.reactivate(userToModify.id);
       loadUsers();
       showToast.success('User reactivated successfully');
@@ -114,7 +111,10 @@ const UserManagement = () => {
       console.error('Failed to reactivate user:', error);
       showToast.error(error.response?.data?.message || 'Failed to reactivate user');
     } finally {
-      setReactivating(false);
+      setReactivating(false
+    } catch (error) {
+      console.error('Failed to reactivate user:', error);
+      showToast.error(error.response?.data?.message || 'Failed to reactivate user');
     }
   };
 
@@ -280,13 +280,7 @@ const UserManagement = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="STAFF">Staff</SelectItem>
-                  <SelectItem value="ACCOUNTANT">Accountant</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)} disabled={creating}>
+                  <SelectItem value="STAFF">Staff</SelectItem> disabled={creating}>
                 Cancel
               </Button>
               <Button type="submit" disabled={creating}>
@@ -298,6 +292,12 @@ const UserManagement = () => {
                 ) : (
                   'Create User'
                 )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Create User
               </Button>
             </DialogFooter>
           </form>
@@ -324,17 +324,7 @@ const UserManagement = () => {
               <div className="rounded-full bg-amber-500/10 p-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
               </div>
-              <AlertDialogTitle className="text-xl font-semibold tracking-tight">
-                Deactivate User
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription>
-              Are you sure you want to deactivate <strong>{userToModify?.name}</strong>? 
-              This user will no longer be able to access the system until reactivated.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
+              <AlertDialogTitl disabled={deactivating}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmDeactivate}
               disabled={deactivating}
@@ -347,31 +337,23 @@ const UserManagement = () => {
                 </>
               ) : (
                 'Deactivate User'
-              )}
+              )}u want to deactivate <strong>{userToModify?.name}</strong>? 
+              This user will no longer be able to access the system until reactivated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeactivate}
+              className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/20"
+            >
+              Deactivate User
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reactivate Confirmation Dialog */}
-      <AlertDialog open={showReactivateDialog} onOpenChange={setShowReactivateDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="rounded-full bg-emerald-500/10 p-2">
-                <UserCheck className="w-5 h-5 text-emerald-600" />
-              </div>
-              <AlertDialogTitle className="text-xl font-semibold tracking-tight">
-                Reactivate User
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription>
-              Are you sure you want to reactivate <strong>{userToModify?.name}</strong>? 
-              This user will regain access to the system with their previous permissions.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={reactivating}>Cancel</AlertDialogCancel>
+      {/* Reactivate Confirmat disabled={reactivating}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmReactivate}
               disabled={reactivating}
@@ -384,7 +366,25 @@ const UserManagement = () => {
                 </>
               ) : (
                 'Reactivate User'
-              )}
+              )}"rounded-full bg-emerald-500/10 p-2">
+                <UserCheck className="w-5 h-5 text-emerald-600" />
+              </div>
+              <AlertDialogTitle className="text-xl font-semibold tracking-tight">
+                Reactivate User
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Are you sure you want to reactivate <strong>{userToModify?.name}</strong>? 
+              This user will regain access to the system with their previous permissions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmReactivate}
+              className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
+            >
+              Reactivate User
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

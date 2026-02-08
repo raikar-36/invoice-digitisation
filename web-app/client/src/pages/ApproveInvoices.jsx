@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Loader2, XCircle, Eye } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle, Eye, AlertTriangle } from 'lucide-react';
 import { invoiceAPI } from '../services/api';
-import { showToast, confirmAction } from '../utils/toast.jsx';
+import { showToast } from '../utils/toast.jsx';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatDate } from '../utils/dateFormatter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis } from '@/components/ui/pagination';
 
 const ApproveInvoices = () => {
   const navigate = useNavigate();
@@ -19,10 +21,13 @@ const ApproveInvoices = () => {
   const [error, setError] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [invoiceToApprove, setInvoiceToApprove] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 9;
 
   useEffect(() => {
     fetchPendingApprovalInvoices();
@@ -41,29 +46,33 @@ const ApproveInvoices = () => {
     }
   };
 
-  const handleApprove = async (invoice) => {
-    confirmAction(
-      `Approve invoice ${invoice.invoice_number} for ₹${invoice.total_amount?.toLocaleString()}?`,
-      async () => {
-        try {
-          setProcessing(true);
-          setError('');
-          
-          await invoiceAPI.approve(invoice.id, {});
-          
-          // Refresh list
-          await fetchPendingApprovalInvoices();
-          
-          showToast.success('Invoice approved successfully!');
-        } catch (err) {
-          setError(err.response?.data?.error || 'Failed to approve invoice');
-          showToast.error(err.response?.data?.error || 'Failed to approve invoice');
-          console.error(err);
-        } finally {
-          setProcessing(false);
-        }
-      }
-    );
+  const handleApproveClick = (invoice) => {
+    setInvoiceToApprove(invoice);
+    setShowApproveDialog(true);
+  };
+
+  const confirmApprove = async () => {
+    if (!invoiceToApprove) return;
+    
+    try {
+      setApproving(true);
+      setError('');
+      
+      await invoiceAPI.approve(invoiceToApprove.id, {});
+      
+      // Refresh list
+      await fetchPendingApprovalInvoices();
+      
+      showToast.success('Invoice approved successfully!');
+      setShowApproveDialog(false);
+      setInvoiceToApprove(null);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to approve invoice');
+      showToast.error(err.response?.data?.error || 'Failed to approve invoice');
+      console.error(err);
+    } finally {
+      setApproving(false);
+    }
   };
 
   const handleRejectClick = (invoice) => {
@@ -79,11 +88,11 @@ const ApproveInvoices = () => {
     }
 
     try {
-      setProcessing(true);
+      setRejecting(true);
       setError('');
       
       await invoiceAPI.reject(selectedInvoice.id, { 
-        rejection_reason: rejectionReason 
+        reason: rejectionReason 
       });
       
       // Refresh list
@@ -97,7 +106,7 @@ const ApproveInvoices = () => {
       showToast.error(err.response?.data?.error || 'Failed to reject invoice');
       console.error(err);
     } finally {
-      setProcessing(false);
+      setRejecting(false);
     }
   };
 
@@ -111,12 +120,34 @@ const ApproveInvoices = () => {
   const currentInvoices = invoices.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(invoices.length / itemsPerPage);
 
-  const goToNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  };
-
-  const goToPrevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
+  const generatePageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('ellipsis');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('ellipsis');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('ellipsis');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
   };
 
   if (loading) {
@@ -278,16 +309,30 @@ const ApproveInvoices = () => {
                       variant="destructive"
                       className="flex-1"
                       onClick={() => handleRejectClick(invoice)}
-                      disabled={processing}
+                      disabled={rejecting || approving}
                     >
-                      Reject
+                      {rejecting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Rejecting...
+                        </>
+                      ) : (
+                        'Reject'
+                      )}
                     </Button>
                     <Button
                       className="flex-1"
-                      onClick={() => handleApprove(invoice)}
-                      disabled={processing}
+                      onClick={() => handleApproveClick(invoice)}
+                      disabled={rejecting || approving}
                     >
-                      {processing ? 'Processing...' : 'Approve →'}
+                      {approving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Approving...
+                        </>
+                      ) : (
+                        'Approve →'
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -298,24 +343,40 @@ const ApproveInvoices = () => {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-4 mt-8">
-            <Button
-              variant="outline"
-              onClick={goToPrevPage}
-              disabled={currentPage === 1}
-            >
-              ← Previous
-            </Button>
-            <span className="font-medium">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              onClick={goToNextPage}
-              disabled={currentPage === totalPages}
-            >
-              Next →
-            </Button>
+          <div className="mt-8">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                
+                {generatePageNumbers().map((page, idx) => (
+                  <PaginationItem key={idx}>
+                    {page === 'ellipsis' ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
         )}
       </>
@@ -348,7 +409,7 @@ const ApproveInvoices = () => {
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={4}
                 placeholder="Explain why this invoice is being rejected..."
-                disabled={processing}
+                disabled={rejecting}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 The invoice will be returned to PENDING_REVIEW status
@@ -360,20 +421,65 @@ const ApproveInvoices = () => {
             <Button
               variant="outline"
               onClick={() => setShowRejectModal(false)}
-              disabled={processing}
+              disabled={rejecting}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleRejectSubmit}
-              disabled={processing || !rejectionReason.trim()}
+              disabled={rejecting || !rejectionReason.trim()}
             >
-              {processing ? 'Rejecting...' : 'Confirm Rejection'}
+              {rejecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                'Confirm Rejection'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approve Confirmation Dialog */}
+      <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="rounded-full bg-emerald-500/10 p-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <AlertDialogTitle className="text-xl font-semibold tracking-tight">
+                Approve Invoice
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Are you sure you want to approve invoice <strong className="font-mono">#{invoiceToApprove?.invoice_number}</strong> for <strong>₹{invoiceToApprove?.total_amount?.toLocaleString()}</strong>?
+              <br />
+              This action will finalize the invoice and it cannot be modified afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={approving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmApprove}
+              disabled={approving}
+              className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
+            >
+              {approving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Approving...
+                </>
+              ) : (
+                'Approve Invoice'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="mt-6 text-sm text-muted-foreground">
         <p><strong>Tip:</strong> Approved invoices will be saved to the database and marked as APPROVED.</p>

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const AuditLog = () => {
   const [auditLogs, setAuditLogs] = useState([]);
@@ -207,21 +208,19 @@ const AuditLog = () => {
 
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
+              <DatePicker
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(date) => setStartDate(date)}
+                placeholder="Select start date"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="endDate">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
+              <DatePicker
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(date) => setEndDate(date)}
+                placeholder="Select end date"
               />
             </div>
 

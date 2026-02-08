@@ -85,3 +85,35 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide native number input spin buttons */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Prevent zoom-related value changes on scroll */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]:focus {
+  -moz-appearance: number-input;
+}
+
+/* Disable mouse wheel on number inputs to prevent accidental changes */
+input[type="number"] {
+  pointer-events: auto;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

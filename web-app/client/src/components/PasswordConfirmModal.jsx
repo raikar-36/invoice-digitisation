@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ShieldAlert, Eye, EyeOff } from 'lucide-react';
 
 const PasswordConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,95 +36,87 @@ const PasswordConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) =>
   const handleClose = () => {
     setPassword('');
     setError('');
+    setShowPassword(false);
     onClose();
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-yellow-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {title || 'Confirm Password'}
-              </h2>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="rounded-full bg-amber-500/10 p-2">
+              <ShieldAlert className="w-5 h-5 text-amber-600" />
             </div>
+            <DialogTitle className="text-xl font-semibold tracking-tight">
+              {title || 'Confirm Password'}
+            </DialogTitle>
+          </div>
+          <DialogDescription>
+            {message || 'Please enter your password to continue with this action.'}
+          </DialogDescription>
+        </DialogHeader>
 
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {message || 'Please enter your password to continue with this action.'}
-            </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
-                  className={`input-field ${error ? 'border-red-500' : ''}`}
-                  placeholder="Enter your password"
-                  disabled={loading}
-                  autoFocus
-                />
-                {error && (
-                  <p className="text-red-500 text-sm mt-1">{error}</p>
+          <div className="space-y-2">
+            <Label htmlFor="password">
+              Password <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError('');
+                }}
+                placeholder="Enter your password"
+                disabled={loading}
+                autoFocus
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                disabled={loading}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
                 )}
-              </div>
+              </button>
+            </div>
+          </div>
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  disabled={loading}
-                  className="btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || !password.trim()}
-                  className="btn-danger flex-1"
-                >
-                  {loading ? 'Verifying...' : 'Confirm'}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={loading || !password.trim()}
+            >
+              {loading ? 'Verifying...' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
