@@ -18,6 +18,7 @@ const ReviewInvoiceDetail = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Customer matching state
   const [matchedCustomer, setMatchedCustomer] = useState(null);
@@ -162,6 +163,11 @@ const ReviewInvoiceDetail = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: null }));
+    }
+    
     // Reset customer selection when phone changes
     if (name === 'customer_phone' && matchedCustomer) {
       setCustomerSelection('existing');
@@ -215,6 +221,12 @@ const ReviewInvoiceDetail = () => {
       
       return { ...prev, items: newItems };
     });
+    
+    // Clear field error for this item field
+    const errorKey = `items[${index}].${field}`;
+    if (fieldErrors[errorKey]) {
+      setFieldErrors(prev => ({ ...prev, [errorKey]: null }));
+    }
   };
 
   const addItem = () => {
@@ -265,6 +277,7 @@ const ReviewInvoiceDetail = () => {
     try {
       setSubmitting(true);
       setError('');
+      setFieldErrors({});
 
       // Validate required fields
       if (!formData.invoice_number || !formData.invoice_date || !formData.total_amount) {
@@ -318,8 +331,21 @@ const ReviewInvoiceDetail = () => {
         navigate('/dashboard/review');
       }, 1500);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit invoice');
-      console.error(err);
+      console.error('Submission error:', err);
+      
+      // Check if we have validation errors
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        setFieldErrors(errors);
+        
+        // Create a user-friendly error message
+        const errorCount = Object.keys(errors).length;
+        setError(`Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} highlighted below`);
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Failed to submit invoice');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -484,9 +510,12 @@ const ReviewInvoiceDetail = () => {
                     name="invoice_number"
                     value={formData.invoice_number}
                     onChange={handleInputChange}
-                    className="input-field"
+                    className={`input-field ${fieldErrors['invoice.invoice_number'] ? 'border-red-500 border-2' : ''}`}
                     placeholder="INV-001"
                   />
+                  {fieldErrors['invoice.invoice_number'] && (
+                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['invoice.invoice_number']}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -497,8 +526,11 @@ const ReviewInvoiceDetail = () => {
                     name="invoice_date"
                     value={formData.invoice_date}
                     onChange={handleInputChange}
-                    className="input-field"
+                    className={`input-field ${fieldErrors['invoice.invoice_date'] ? 'border-red-500 border-2' : ''}`}
                   />
+                  {fieldErrors['invoice.invoice_date'] && (
+                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['invoice.invoice_date']}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -510,9 +542,12 @@ const ReviewInvoiceDetail = () => {
                     name="total_amount"
                     value={formData.total_amount}
                     onChange={handleInputChange}
-                    className="input-field"
+                    className={`input-field ${fieldErrors['invoice.total_amount'] ? 'border-red-500 border-2' : ''}`}
                     placeholder="0.00"
                   />
+                  {fieldErrors['invoice.total_amount'] && (
+                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['invoice.total_amount']}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -616,9 +651,12 @@ const ReviewInvoiceDetail = () => {
                       matchType === 'exact' && customerSelection === 'existing'
                         ? 'bg-gray-100 cursor-not-allowed'
                         : ''
-                    }`}
+                    } ${fieldErrors['customer.name'] ? 'border-red-500 border-2' : ''}`}
                     placeholder="ABC Traders"
                   />
+                  {fieldErrors['customer.name'] && (
+                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['customer.name']}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -634,9 +672,12 @@ const ReviewInvoiceDetail = () => {
                       matchType === 'exact' && customerSelection === 'existing'
                         ? 'bg-gray-100 cursor-not-allowed'
                         : ''
-                    }`}
+                    } ${fieldErrors['customer.phone'] ? 'border-red-500 border-2' : ''}`}
                     placeholder="+91-9876543210"
                   />
+                  {fieldErrors['customer.phone'] && (
+                    <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors['customer.phone']}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -733,9 +774,12 @@ const ReviewInvoiceDetail = () => {
                             type="text"
                             value={item.description}
                             onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                            className="input-field text-sm"
+                            className={`input-field text-sm ${fieldErrors[`items[${index}].description`] ? 'border-red-500 border-2' : ''}`}
                             placeholder="Product name"
                           />
+                          {fieldErrors[`items[${index}].description`] && (
+                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].description`]}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -746,9 +790,12 @@ const ReviewInvoiceDetail = () => {
                             step="0.01"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            className="input-field text-sm"
+                            className={`input-field text-sm ${fieldErrors[`items[${index}].quantity`] ? 'border-red-500 border-2' : ''}`}
                             placeholder="1"
                           />
+                          {fieldErrors[`items[${index}].quantity`] && (
+                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].quantity`]}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -759,9 +806,12 @@ const ReviewInvoiceDetail = () => {
                             step="0.01"
                             value={item.unit_price}
                             onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                            className="input-field text-sm"
+                            className={`input-field text-sm ${fieldErrors[`items[${index}].unit_price`] ? 'border-red-500 border-2' : ''}`}
                             placeholder="0.00"
                           />
+                          {fieldErrors[`items[${index}].unit_price`] && (
+                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].unit_price`]}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -772,9 +822,12 @@ const ReviewInvoiceDetail = () => {
                             step="0.01"
                             value={item.tax_percentage}
                             onChange={(e) => handleItemChange(index, 'tax_percentage', e.target.value)}
-                            className="input-field text-sm"
+                            className={`input-field text-sm ${fieldErrors[`items[${index}].tax_percentage`] ? 'border-red-500 border-2' : ''}`}
                             placeholder="0"
                           />
+                          {fieldErrors[`items[${index}].tax_percentage`] && (
+                            <p className="text-red-600 text-xs mt-1">⚠️ {fieldErrors[`items[${index}].tax_percentage`]}</p>
+                          )}
                         </div>
                         <div className="col-span-2 md:col-span-5">
                           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

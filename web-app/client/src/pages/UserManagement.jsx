@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { userAPI } from '../services/api';
 import { showToast, confirmAction } from '../utils/toast.jsx';
+import { useAuth } from '../contexts/AuthContext';
 
 const UserManagement = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -132,27 +134,33 @@ const UserManagement = () => {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
-                      {user.status === 'ACTIVE' ? (
-                        <button
-                          onClick={() => handleDeactivate(user.id)}
-                          className="text-sm px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                        >
-                          Deactivate
-                        </button>
+                      {user.id === currentUser?.id ? (
+                        <span className="text-xs text-gray-500 italic px-3 py-1">You cannot modify your own account</span>
                       ) : (
-                        <button
-                          onClick={() => handleReactivate(user.id)}
-                          className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                        >
-                          Reactivate
-                        </button>
+                        <>
+                          {user.status === 'ACTIVE' ? (
+                            <button
+                              onClick={() => handleDeactivate(user.id)}
+                              className="text-sm px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                            >
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleReactivate(user.id)}
+                              className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                            >
+                              Reactivate
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(user.id)}
+                            className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                      >
-                        Delete
-                      </button>
                     </div>
                   </td>
                 </tr>
