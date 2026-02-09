@@ -1,31 +1,35 @@
-# Smart Invoice System - Setup Guide
+# Smart Invoice System - Complete Setup Guide
 
-## Automated Setup (Recommended)
+This guide provides detailed, step-by-step instructions for setting up the Smart Invoice Management System on Windows, Linux, and macOS.
 
-### Windows
-```powershell
-.\start.ps1
-```
+## 📋 Table of Contents
 
-### Linux/macOS
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-The automated script will:
-- Check prerequisites (Node.js, npm)
-- Create .env from template
-- Install dependencies
-- Optionally seed database
-- Start development servers
+- [Prerequisites](#prerequisites)
+- [Automated Setup](#automated-setup-recommended)
+- [Manual Setup](#manual-setup)
+- [Database Configuration](#database-configuration)
+- [Starting the Application](#starting-the-application)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## Manual Setup Guide (Windows)
+## Prerequisites
 
-### Step 1: Verify Prerequisites
-```powershell
+Before you begin, ensure you have:
+
+### Required
+- **Node.js 18+** - [Download from nodejs.org](https://nodejs.org/)
+- **npm** (comes with Node.js)
+- **MongoDB Atlas account** - [Sign up at mongodb.com](https://www.mongodb.com/cloud/atlas)
+- **PostgreSQL database** - [Neon.tech](https://neon.tech) recommended (free tier available)
+
+### Optional
+- **External OCR Service** - Python-based service for automatic invoice data extraction
+- **Git** - For version control
+
+### Check Prerequisites
+```bash
 # Check Node.js version (should be 18+)
 node --version
 
@@ -33,8 +37,55 @@ node --version
 npm --version
 ```
 
-### Step 2: Install Dependencies
+---
+
+## Automated Setup (Recommended)
+
+The easiest way to get started is using our automated setup scripts.
+
+### Windows (PowerShell)
 ```powershell
+# Run the setup script
+.\start.ps1
+```
+
+### Linux/macOS (Bash)
+```bash
+# Make script executable
+chmod +x start.sh
+
+# Run the setup script
+./start.sh
+```
+
+The automated script will:
+1. ✅ Check for Node.js and npm
+2. ✅ Create `.env` file from template
+3. ✅ Install all dependencies (backend & frontend)
+4. ✅ Optionally seed the database with demo users
+5. ✅ Start both development servers
+
+**Follow the prompts** to configure your database connections.
+
+---
+
+## Manual Setup
+
+If you prefer manual setup or need more control:
+
+### Step 1: Clone or Download
+
+```bash
+# If using Git
+git clone <repository-url>
+cd copilot
+
+# Or download zip and extract
+```
+
+### Step 2: Install Dependencies
+
+```bash
 # Install backend dependencies
 npm install
 
@@ -44,36 +95,41 @@ npm install
 cd ..
 ```
 
-### Step 3: Configure Environment
+This will install:
+- **Backend**: Express, PostgreSQL client, MongoDB driver, JWT, Multer, etc.
+- **Frontend**: React, Vite, Tailwind CSS, Framer Motion, Recharts, etc.
 
-1. Copy `.env.example` to `.env`:
-```powershell
-Copy-Item .env.example .env
+### Step 3: Environment Configuration
+
+1. **Copy the template**:
+```bash
+cp .env.example .env
 ```
 
-2. Edit `.env` and update these values:
+2. **Edit `.env` file** with your configuration:
 
-**MongoDB Atlas Setup:**
-1. Go to https://www.mongodb.com/cloud/atlas
-2. Create free cluster
-3. Get connection string
-4. Update `MONGODB_URI` in `.env`
-
-**NeonDB (PostgreSQL) Setup:**
-1. Go to https://neon.tech
-2. Create free project
-3. Get connection string
-4. Update `POSTGRES_URI` in `.env`
-
-**Required .env values:**
 ```env
-MONGODB_URI=mongodb+srv://YOUR_USER:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/invoice_system
-POSTGRES_URI=postgresql://YOUR_USER:YOUR_PASSWORD@YOUR_HOST.neon.tech/invoice_db?sslmode=require
-JWT_SECRET=change-this-to-a-random-secret-key
-OCR_SERVICE_URL=http://localhost:8000/api/v1/process-invoice
-```
+# ===========================================
+# SERVER CONFIGURATION
+# ===========================================
+PORT=5000
+NODE_ENV=development
 
-### Step 4: Seed Database
+# ===========================================
+# DATABASE CONNECTIONS
+# ===========================================
+
+# MongoDB Atlas (for documents and OCR data)
+# Format: mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>
+MONGODB_URI=mongodb+srv://your_username:your_password@cluster0.xxxxx.mongodb.net/invoice_system?retryWrites=true&w=majority
+
+# PostgreSQL / Neon (for structured data)
+# Format: postgresql://<username>:<password>@<host>/<database>?sslmode=require
+POSTGRES_URI=postgresql://your_username:your_password@ep-cool-name-xxxxx.region.neon.tech/invoice_db?sslmode=require
+
+# ===========================================
+# AUTHENTICATION
+# ===========================================
 ```powershell
 node server/seed.js
 ```
@@ -91,133 +147,290 @@ You should see:
 
 ### Step 5: Start Development Servers
 
-**Option 1: Both servers together**
-```powershell
+# Generate a random secret (recommended)
+# Linux/macOS: openssl rand -base64 32
+# Windows: [System.Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+JWT_SECRET=your-super-secret-jwt-key-please-change-this-in-production
+JWT_EXPIRES_IN=7d
+
+# ===========================================
+# OCR SERVICE (Optional)
+# ===========================================
+# External Python OCR service URL
+# System works without OCR - you can manually enter data
+OCR_SERVICE_URL=http://localhost:8000/api/v1/process-invoice
+OCR_TIMEOUT=100000
+
+# ===========================================
+# FILE UPLOADS
+# ===========================================
+MAX_FILE_SIZE=10485760
+UPLOAD_DIR=uploads
+```
+
+---
+
+## Database Configuration
+
+### MongoDB Atlas Setup
+
+1. **Create Account**: Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+2. **Create Cluster**:
+   - Choose free tier (M0)
+   - Select region closest to you
+   - Name your cluster
+3. **Create Database User**:
+   - Database Access → Add New Database User
+   - Choose password authentication
+   - Save username and password
+4. **Whitelist IP**:
+   - Network Access → Add IP Address
+   - Click "Allow Access from Anywhere" (0.0.0.0/0) for development
+5. **Get Connection String**:
+   - Clusters → Connect → Connect your application
+   - Copy connection string
+   - Replace `<password>` with your user password
+   - Add database name: `/invoice_system`
+
+**Example**:
+```
+mongodb+srv://myuser:mypass123@cluster0.abc123.mongodb.net/invoice_system?retryWrites=true&w=majority
+```
+
+### PostgreSQL / Neon Setup
+
+1. **Create Account**: Go to [neon.tech](https://neon.tech)
+2. **Create Project**:
+   - Click "Create Project"
+   - Name: "Invoice System"
+   - Region: Choose closest
+3. **Get Connection String**:
+   - Dashboard → Connection Details
+   - Copy "Connection string"
+   - Make sure it includes `?sslmode=require`
+
+**Example**:
+```
+postgresql://myuser:mypass123@ep-cool-name-12345.us-east-2.aws.neon.tech/invoice_db?sslmode=require
+```
+
+---
+
+## Starting the Application
+
+### Step 4: Seed Database
+
+Initialize database with schema and demo users:
+
+```bash
+node server/seed.js
+```
+
+**Expected Output**:
+```
+✓ Connected to MongoDB
+✓ Connected to PostgreSQL
+✓ Database tables created successfully
+✓ Created owner user: owner@invoice.com / admin123
+✓ Created staff user: staff@invoice.com / staff123
+✓ Created accountant user: accountant@invoice.com / accountant123
+✅ Database seeding completed successfully!
+```
+
+### Step 5: Start Development Servers
+
+**Option 1: Both servers together** (Recommended)
+```bash
 npm run dev
 ```
 
 **Option 2: Separate terminals**
 
-Terminal 1:
-```powershell
+Terminal 1 (Backend):
+```bash
 npm run server
 ```
 
-Terminal 2:
-```powershell
+Terminal 2 (Frontend):
+```bash
 npm run client
 ```
 
-### Step 6: Access Application
+**Servers will start on**:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:5000`
 
-Open browser to: **http://localhost:5173**
+---
 
-Login with:
-- Owner: `owner@invoice.com` / `admin123`
-- Staff: `staff@invoice.com` / `staff123`
-- Accountant: `accountant@invoice.com` / `accountant123`
+## Verification
 
-## 🔧 Troubleshooting
+### Step 6: Test the Application
+
+1. **Open Browser**: Navigate to `http://localhost:5173`
+
+2. **Login with Demo Users**:
+   - **Owner**: `owner@invoice.com` / `admin123`
+   - **Staff**: `staff@invoice.com` / `staff123`
+   - **Accountant**: `accountant@invoice.com` / `accountant123`
+
+3. **Test Basic Flow**:
+   - Upload an invoice (any image/PDF)
+   - Review and enter data manually
+   - Submit for approval
+   - Approve as owner
+   - View in reports
+
+---
+
+## Troubleshooting
 
 ### "Cannot find module" errors
-```powershell
-# Delete node_modules and reinstall
+
+```bash
+# Delete node_modules and reinstall (Windows)
 Remove-Item -Recurse -Force node_modules
 Remove-Item -Recurse -Force client/node_modules
 npm install
-cd client
+cd client && npm install && cd ..
+
+# Linux/macOS
+rm -rf node_modules client/node_modules
 npm install
-cd ..
+cd client && npm install && cd ..
 ```
 
-### Database connection errors
-- Verify your MongoDB URI is correct
-- Check PostgreSQL connection string
-- Ensure your IP is whitelisted in MongoDB Atlas
-- For NeonDB, ensure SSL mode is set
+### Database Connection Errors
 
-### Port already in use
+**MongoDB**:
+- Verify connection string format
+- Ensure password doesn't contain special characters (use URI encoding if needed)
+- Check Network Access whitelist in MongoDB Atlas
+- Test connection: `node -e "require('mongodb').MongoClient.connect('YOUR_URI', (err) => console.log(err || 'Connected'))"`
+
+**PostgreSQL**:
+- Verify connection string includes `?sslmode=require`
+- Check credentials are correct
+- Ensure database name exists
+- Test connection: `node -e "require('pg').Pool({connectionString: 'YOUR_URI'}).query('SELECT 1', (err) => console.log(err || 'Connected'))"`
+
+### Port Already in Use
+
+**Windows**:
 ```powershell
-# Find and kill process using port 5000
+# Find process on port 5000
 Get-Process -Id (Get-NetTCPConnection -LocalPort 5000).OwningProcess | Stop-Process
 
 # Or change port in .env
-PORT=5001
+# PORT=5001
 ```
 
-### OCR service not available
-The OCR service is external. For development:
-1. The system will work without it (returns empty OCR data)
-2. You can manually enter all invoice data
-3. To add real OCR, deploy a Python OCR service separately
+**Linux/macOS**:
+```bash
+# Find and kill process on port 5000
+lsof -ti:5000 | xargs kill -9
 
-## 📝 Development Workflow
+# Or change port in .env
+# PORT=5001
+```
 
-### Testing the Full Flow
+### OCR Service Not Available
 
-1. **As Owner** (owner@invoice.com):
-   - Upload an invoice (use any image/PDF)
-   - Review the OCR data (will be empty without OCR service)
-   - Manually enter invoice data
-   - Submit for approval
-   - Go to "Approve Queue"
-   - Approve the invoice
-   - View in "All Invoices"
-   - Check Reports dashboard
+The OCR service is optional. Without it:
+- ✅ System works normally
+- ✅ Upload and review work fine
+- ✅ You manually enter all invoice data
+- ❌ No automatic data extraction
 
-2. **As Staff** (staff@invoice.com):
-   - Upload an invoice
-   - Review and submit
-   - Verify you cannot see "Approve Queue"
-   - View only your own pending invoices
+**To add OCR later**:
+1. Deploy Python OCR service separately
+2. Update `OCR_SERVICE_URL` in `.env`
+3. Restart server
 
-3. **As Accountant** (accountant@invoice.com):
-   - View only approved invoices
-   - Access reports
-   - Verify no upload/review access
+### Frontend Build Errors
 
-## 🗃️ Database Management
+```bash
+# Clear Vite cache
+cd client
+rm -rf node_modules/.vite
+npm run dev
+```
 
-### Reset Database
-```powershell
-# Re-run seed script (will skip if owner exists)
+### CORS Errors
+
+If frontend can't reach backend:
+1. Check both servers are running
+2. Verify frontend is on port 5173
+3. Verify backend is on port 5000
+4. Check browser console for specific error
+
+---
+
+## Development Tips
+
+### Database Management
+
+**Reset Database**:
+```bash
+# Re-run seed (creates tables and users if missing)
 node server/seed.js
 ```
 
-### Access PostgreSQL
-If using NeonDB, use their web SQL editor or:
-```powershell
-# Install PostgreSQL client
-# Then connect:
-psql "postgresql://user:pass@host.neon.tech/invoice_db?sslmode=require"
+**Access PostgreSQL** (using Neon web console):
+- Login to neon.tech → Select project → SQL Editor
+
+**Access MongoDB** (using Compass):
+1. Download [MongoDB Compass](https://www.mongodb.com/products/compass)
+2. Connect using your `MONGODB_URI`
+3. Browse collections in `invoice_system` database
+
+### Hot Reload
+
+Both servers support hot reload:
+- **Backend**: Changes auto-restart (via nodemon)
+- **Frontend**: Changes auto-refresh (via Vite HMR)
+
+### API Testing
+
+Use tools like:
+- **Postman**: Import endpoints from README
+- **Thunder Client**: VS Code extension
+- **curl**: Command line testing
+
+Example:
+```bash
+# Login
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"owner@invoice.com","password":"admin123"}'
+
+# Get invoices (include cookie from login)
+curl http://localhost:5000/api/invoices \
+  -H "Cookie: token=YOUR_JWT_TOKEN"
 ```
 
-### Access MongoDB
-Use MongoDB Compass:
-1. Download from: https://www.mongodb.com/products/compass
-2. Connect using your MONGODB_URI
-3. Browse `invoice_system` database
+---
 
-## 🎨 Customization
+## Next Steps
 
-### Change Theme Colors
-Edit `client/tailwind.config.js`:
-```javascript
-theme: {
-  extend: {
-    colors: {
-      'pending-review': '#YOUR_COLOR',
-      'pending-approval': '#YOUR_COLOR',
-      'approved': '#YOUR_COLOR',
-      'rejected': '#YOUR_COLOR',
-    }
-  }
-}
-```
+1. ✅ **Explore Features**: Try all user roles and features
+2. ✅ **Customize**: Update branding, colors, and theme
+3. ✅ **Add Data**: Upload real invoices and products
+4. ✅ **Deploy**: Consider production deployment (see TROUBLESHOOTING.md)
+5. ✅ **Integrate**: Connect external OCR service for automation
 
-### Add New User Role
-1. Update database schema in `server/config/schema.js`
-2. Add role to JWT middleware
+---
+
+## Additional Resources
+
+- **Main Documentation**: [README.md](README.md)
+- **Common Issues**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **MongoDB Docs**: [docs.mongodb.com](https://docs.mongodb.com)
+- **PostgreSQL Docs**: [postgresql.org/docs](https://www.postgresql.org/docs)
+- **Neon Docs**: [neon.tech/docs](https://neon.tech/docs)
+
+---
+
+**Need help?** Check TROUBLESHOOTING.md or review server logs in terminal where you ran `npm run server`.
 3. Update UI role checks in `App.jsx`
 4. Add navigation links in `DashboardLayout.jsx`
 
