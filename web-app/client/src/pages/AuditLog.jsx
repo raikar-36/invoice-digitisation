@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { format } from 'date-fns';
-import { auditAPI, userAPI, invoiceAPI } from '../services/api';
-import { FileSearch, Loader2, Filter, X } from 'lucide-react';
+import { auditAPI, userAPI } from '../services/api';
+import { formatDateTime } from '../utils/dateFormatter';
+import { FileSearch, Loader2, Filter, X, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +13,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+// Action badge colors - memoized outside component
+const ACTION_BADGE_COLORS = {
+  'INVOICE_UPLOADED': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+  'INVOICE_UPDATED': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
+  'INVOICE_SUBMITTED': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800',
+  'INVOICE_APPROVED': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+  'INVOICE_REJECTED': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800',
+  'PDF_GENERATED': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800',
+  'USER_CREATED': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border border-teal-200 dark:border-teal-800',
+  'USER_DEACTIVATED': 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-200 dark:border-slate-800',
+  'ROLE_CHANGED': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800'
+};
+
+const ACTION_TYPES = [
+  'INVOICE_UPLOADED',
+  'INVOICE_UPDATED',
+  'INVOICE_SUBMITTED',
+  'INVOICE_APPROVED',
+  'INVOICE_REJECTED',
+  'PDF_GENERATED',
+  'USER_CREATED',
+  'USER_DEACTIVATED',
+  'ROLE_CHANGED'
+];
 
 const AuditLog = () => {
   const [auditLogs, setAuditLogs] = useState([]);
-  const [filteredLogs, setFilteredLogs] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,6 +53,10 @@ const AuditLog = () => {
   const [endDate, setEndDate] = useState('');
   const [searchInvoice, setSearchInvoice] = useState('');
 
+  // Modal state
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -36,9 +65,10 @@ const AuditLog = () => {
     fetchData();
   }, []);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
-    applyFilters();
-  }, [auditLogs, selectedUser, selectedAction, startDate, endDate, searchInvoice]);
+    setCurrentPage(1);
+  }, [selectedUser, selectedAction, startDate, endDate, searchInvoice]);
 
   const fetchData = async () => {
     try {
@@ -59,7 +89,8 @@ const AuditLog = () => {
     }
   };
 
-  const applyFilters = () => {
+  // Derive filtered data using useMemo - prevents double rendering
+  const filteredLogs = useMemo(() => {
     let filtered = [...auditLogs];
 
     // Filter by user
@@ -73,7 +104,7 @@ const AuditLog = () => {
       filtered = filtered.filter(log => log.action === selectedAction);
     }
 
-    // Filter by date range
+    // Filter by date range with correct time boundaries
     if (startDate && startDate !== '') {
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
@@ -97,9 +128,8 @@ const AuditLog = () => {
       );
     }
 
-    setFilteredLogs(filtered);
-    setCurrentPage(1);
-  };
+    return filtered;
+  }, [auditLogs, selectedUser, selectedAction, startDate, endDate, searchInvoice]);
 
   const clearFilters = () => {
     setSelectedUser('');
@@ -109,31 +139,55 @@ const AuditLog = () => {
     setSearchInvoice('');
   };
 
-  const actionTypes = [
-    'INVOICE_UPLOADED',
-    'INVOICE_UPDATED',
-    'INVOICE_SUBMITTED',
-    'INVOICE_APPROVED',
-    'INVOICE_REJECTED',
-    'PDF_GENERATED',
-    'USER_CREATED',
-    'USER_DEACTIVATED',
-    'ROLE_CHANGED'
-  ];
+  const openDetailsModal = (log) => {
+    setSelectedLog(log);
+    setIsModalOpen(true);
+  };
 
-  const getActionBadgeColor = (action) => {
-    const variants = {
-      'INVOICE_UPLOADED': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
-      'INVOICE_UPDATED': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
-      'INVOICE_SUBMITTED': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800',
-      'INVOICE_APPROVED': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
-      'INVOICE_REJECTED': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800',
-      'PDF_GENERATED': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800',
-      'USER_CREATED': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border border-teal-200 dark:border-teal-800',
-      'USER_DEACTIVATED': 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-200 dark:border-slate-800',
-      'ROLE_CHANGED': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800'
-    };
-    return variants[action] || 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-200 dark:border-slate-800';
+  const closeDetailsModal = () => {
+    setIsModalOpen(false);
+    setSelectedLog(null);
+  };
+
+  // Check if details is JSON
+  const isJSON = (str) => {
+    if (typeof str !== 'string') return false;
+    try {
+      const parsed = JSON.parse(str);
+      return typeof parsed === 'object';
+    } catch {
+      return false;
+    }
+  };
+
+  const renderDetailsContent = (details) => {
+    if (!details) return 'No details available';
+    
+    if (typeof details === 'object') {
+      // Already an object, render as JSON
+      return (
+        <pre className="text-sm bg-muted p-4 rounded-lg overflow-auto font-mono max-h-[500px]">
+          {JSON.stringify(details, null, 2)}
+        </pre>
+      );
+    }
+    
+    if (isJSON(details)) {
+      // String that is JSON, parse and render
+      const parsed = JSON.parse(details);
+      return (
+        <pre className="text-sm bg-muted p-4 rounded-lg overflow-auto font-mono max-h-[500px]">
+          {JSON.stringify(parsed, null, 2)}
+        </pre>
+      );
+    }
+    
+    // Plain text - render with proper wrapping
+    return (
+      <div className="text-sm bg-muted p-4 rounded-lg whitespace-pre-wrap break-words max-h-[500px] overflow-auto">
+        {details}
+      </div>
+    );
   };
 
   // Pagination
@@ -202,7 +256,7 @@ const AuditLog = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Actions</SelectItem>
-                  {actionTypes.map(action => (
+                  {ACTION_TYPES.map(action => (
                     <SelectItem key={action} value={action}>
                       {action.replace(/_/g, ' ')}
                     </SelectItem>
@@ -309,13 +363,13 @@ const AuditLog = () => {
                         className="hover:bg-muted/50 transition-colors"
                       >
                         <TableCell className="text-sm font-mono">
-                          {format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm:ss')}
+                          {formatDateTime(log.timestamp)}
                         </TableCell>
                         <TableCell className="text-sm">
                           {log.user_name || `User ${log.user_id}`}
                         </TableCell>
                         <TableCell>
-                          <Badge className={getActionBadgeColor(log.action)}>
+                          <Badge className={ACTION_BADGE_COLORS[log.action] || 'bg-slate-100 text-slate-700'}>
                             {log.action.replace(/_/g, ' ')}
                           </Badge>
                         </TableCell>
@@ -332,15 +386,16 @@ const AuditLog = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {log.details && Object.keys(log.details).length > 0 ? (
-                            <details className="cursor-pointer">
-                              <summary className="text-primary hover:underline">
-                                View Details
-                              </summary>
-                              <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto font-mono">
-                                {JSON.stringify(log.details, null, 2)}
-                              </pre>
-                            </details>
+                          {log.details ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDetailsModal(log)}
+                              className="text-primary hover:text-primary/80"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Details
+                            </Button>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
@@ -381,6 +436,28 @@ const AuditLog = () => {
           )}
         </>
       )}
+
+      {/* Details Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Badge className={ACTION_BADGE_COLORS[selectedLog?.action] || 'bg-slate-100 text-slate-700'}>
+                {selectedLog?.action.replace(/_/g, ' ')}
+              </Badge>
+              <span className="text-sm text-muted-foreground font-normal">
+                by {selectedLog?.user_name || `User ${selectedLog?.user_id}`}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              {selectedLog && formatDateTime(selectedLog.timestamp)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {selectedLog && renderDetailsContent(selectedLog.details)}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

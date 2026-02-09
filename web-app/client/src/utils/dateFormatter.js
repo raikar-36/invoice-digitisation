@@ -1,7 +1,20 @@
 /**
- * Format a date to dd/mm/yyyy format
+ * Convert UTC date to IST (Asia/Kolkata timezone)
+ * IST is UTC+5:30
+ * @param {Date|string} date - The date to convert
+ * @returns {Date} - Date object in IST
+ */
+const toIST = (date) => {
+  const utcDate = new Date(date);
+  // IST offset is +5 hours 30 minutes (330 minutes)
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+  return new Date(utcDate.getTime() + istOffset);
+};
+
+/**
+ * Format a date to dd/mm/yyyy format in IST
  * @param {Date|string} date - The date to format
- * @returns {string} - Formatted date string in dd/mm/yyyy format
+ * @returns {string} - Formatted date string in dd/mm/yyyy format (IST)
  */
 export const formatDate = (date) => {
   if (!date) return 'N/A';
@@ -11,17 +24,20 @@ export const formatDate = (date) => {
   // Check if date is valid
   if (isNaN(dateObj.getTime())) return 'Invalid Date';
   
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const year = dateObj.getFullYear();
+  // Convert to IST
+  const istDate = toIST(dateObj);
+  
+  const day = String(istDate.getDate()).padStart(2, '0');
+  const month = String(istDate.getMonth() + 1).padStart(2, '0');
+  const year = istDate.getFullYear();
   
   return `${day}/${month}/${year}`;
 };
 
 /**
- * Format a date to dd/mm/yyyy with time
+ * Format a date to dd/mm/yyyy with time in IST
  * @param {Date|string} date - The date to format
- * @returns {string} - Formatted date string in dd/mm/yyyy HH:mm format
+ * @returns {string} - Formatted date string in dd/mm/yyyy HH:mm:ss format (IST)
  */
 export const formatDateTime = (date) => {
   if (!date) return 'N/A';
@@ -31,13 +47,17 @@ export const formatDateTime = (date) => {
   // Check if date is valid
   if (isNaN(dateObj.getTime())) return 'Invalid Date';
   
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const year = dateObj.getFullYear();
-  const hours = String(dateObj.getHours()).padStart(2, '0');
-  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  // Convert to IST
+  const istDate = toIST(dateObj);
   
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  const day = String(istDate.getDate()).padStart(2, '0');
+  const month = String(istDate.getMonth() + 1).padStart(2, '0');
+  const year = istDate.getFullYear();
+  const hours = String(istDate.getHours()).padStart(2, '0');
+  const minutes = String(istDate.getMinutes()).padStart(2, '0');
+  const seconds = String(istDate.getSeconds()).padStart(2, '0');
+  
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} IST`;
 };
 
 /**

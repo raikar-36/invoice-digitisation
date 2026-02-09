@@ -1,12 +1,21 @@
 const { getPostgresPool } = require('../config/database');
 
-exports.log = async ({ invoiceId = null, userId, action, details = {} }) => {
+exports.log = async ({ 
+  invoiceId = null, 
+  userId, 
+  action, 
+  details = ''
+}) => {
   try {
     const pool = getPostgresPool();
+    
+    // Store details as string (already formatted as human-readable message)
+    const detailsToStore = typeof details === 'string' ? details : JSON.stringify(details);
+    
     await pool.query(
       `INSERT INTO audit_log (invoice_id, user_id, action, details)
        VALUES ($1, $2, $3, $4)`,
-      [invoiceId, userId, action, JSON.stringify(details)]
+      [invoiceId, userId, action, detailsToStore]
     );
   } catch (error) {
     console.error('Audit log error:', error);

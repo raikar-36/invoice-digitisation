@@ -2,6 +2,7 @@ const { getPostgresPool } = require('../config/database');
 const documentService = require('../services/document.service');
 const ocrService = require('../services/ocr.service');
 const auditService = require('../services/audit.service');
+const auditHelper = require('../utils/auditHelper');
 const { normalizePhone } = require('../utils/phoneNormalizer');
 const { normalizeDate } = require('../utils/dateNormalizer');
 const { invalidateAnalyticsCache } = require('../utils/cacheManager');
@@ -154,12 +155,20 @@ exports.uploadInvoice = async (req, res) => {
       console.log('✅ Invoice updated with OCR data');
     }
 
-    // Log audit
+    // Log audit with comprehensive details
+    const userResult = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+    const userName = userResult.rows[0]?.name || 'User';
+    
     await auditService.log({
       invoiceId,
       userId,
       action: 'INVOICE_UPLOADED',
-      details: { file_count: files.length }
+      details: auditHelper.createInvoiceAuditDetails('INVOICE_UPLOADED', {
+        invoiceNumber: normalized?.invoice?.invoice_number,
+        totalAmount: normalized?.invoice?.total_amount,
+        userName: userName,
+        customerName: normalized?.invoice?.customer_name || 'Unknown Customer'
+      })
     });
 
     console.log('========== UPLOAD COMPLETE ==========\n');
@@ -557,12 +566,24 @@ exports.updateInvoice = async (req, res) => {
       }
     }
 
-    // Log audit
+    // Log audit with comprehensive details
     await auditService.log({
       invoiceId: id,
       userId,
-      action: 'INVOICE_REVIEWED',
-      details: { updated_fields: Object.keys(updateData) }
+      action: 'INVOICE_UPDATED',
+      details: auditHelper.createInvoiceAuditDetails('INVOICE_UPDATED', {
+        invoiceNumber: invoice.invoice_number,
+        updatedFields: Object.keys(updateData),
+        changes: auditHelper.getChangedFields(
+          { 
+            invoice_number: invoice.invoice_number,
+            invoice_date: invoice.invoice_date,
+            total_amount: invoice.total_amount,
+            customer_name: invoice.customer_name
+          },
+          updateData
+        )
+      })
     });
 
     res.json({
@@ -685,15 +706,15 @@ exports.submitForApproval = async (req, res) => {
       }
     });
 
-    // Log audit
+    // Log audit with comprehensive details
     await auditService.log({
       invoiceId: id,
       userId,
       action: 'INVOICE_SUBMITTED',
-      details: {
-        useExistingCustomer,
-        existingCustomerId
-      }
+      details: auditHelper.createInvoiceAuditDetails('INVOICE_SUBMITTED', {
+        invoiceNumber: invoiceData.invoice_number,
+        totalAmount: invoiceData.total_amount
+      })
     });
 
     // Invalidate analytics cache (new submitted invoices affect pending counts)
@@ -878,12 +899,19 @@ exports.approveInvoice = async (req, res) => {
       await client.query('COMMIT');
       console.log('\n========== ✅ TRANSACTION COMMITTED ==========\n');
 
-      // Log audit
+      // Log audit with comprehensive details
+      const approverResult = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+      const approverName = approverResult.rows[0]?.name || 'Manager';
+      
       await auditService.log({
         invoiceId: id,
         userId,
         action: 'INVOICE_APPROVED',
-        details: { customer_id: customerId }
+        details: auditHelper.createInvoiceAuditDetails('INVOICE_APPROVED', {
+          invoiceNumber: invoice.invoice_number,
+          totalAmount: invoice.total_amount,
+          approverName: approverName
+        })
       });
 
       // Invalidate analytics cache since invoice data changed
@@ -951,12 +979,18 @@ exports.rejectInvoice = async (req, res) => {
       ['PENDING_REVIEW', reason, id]
     );
 
-    // Log audit
+    // Log audit with comprehensive details
+    const rejecterResult = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+    const rejecterName = rejecterResult.rows[0]?.name || 'Manager';
+    
     await auditService.log({
       invoiceId: id,
       userId,
       action: 'INVOICE_REJECTED',
-      details: { reason }
+      details: auditHelper.createInvoiceAuditDetails('INVOICE_REJECTED', {
+        rejectedBy: rejecterName,
+        reason: reason
+      })
     });
 
     // Invalidate analytics cache (rejected invoices affect pending counts)
@@ -1043,15 +1077,12 @@ exports.deleteInvoice = async (req, res) => {
     );
     console.log('✅ PostgreSQL invoice deleted, rows affected:', deleteResult.rowCount);
 
-    // Log audit
+    // Log audit with comprehensive deletion details
     await auditService.log({
       invoiceId: null, // Invoice is deleted, so no invoice_id
       userId,
       action: 'INVOICE_DELETED',
-      details: { 
-        deleted_invoice_id: parseInt(id),
-        invoice_number: invoice.invoice_number 
-      }
+      details: `Invoice #${invoice.invoice_number} deleted, Amount: ₹${parseFloat(invoice.total_amount).toLocaleString('en-IN')}`
     });
 
     console.log('========== INVOICE DELETION COMPLETE ==========\n');
@@ -1336,12 +1367,16 @@ exports.generatePdf = async (req, res) => {
       [documentId, id]
     );
 
-    // Log audit
+    // Log audit with comprehensive details
+    const invoiceForAudit = await pool.query('SELECT invoice_number FROM invoices WHERE id = $1', [id]);
+    
     await auditService.log({
       invoiceId: id,
       userId,
       action: 'PDF_GENERATED',
-      details: { document_id: documentId }
+      details: auditHelper.createInvoiceAuditDetails('PDF_GENERATED', {
+        invoiceNumber: invoiceForAudit.rows[0]?.invoice_number
+      })
     });
 
     res.json({
@@ -1565,12 +1600,12 @@ exports.logDuplicateIgnored = async (req, res) => {
     const { invoice_id, matched_invoice_id } = req.body;
     const userId = req.user.userId;
 
-    await auditService.logAction(
-      invoice_id,
-      userId,
-      'DUPLICATE_IGNORED',
-      { matched_invoice_id }
-    );
+    await auditService.log({
+      invoiceId: invoice_id,
+      userId: userId,
+      action: 'DUPLICATE_IGNORED',
+      details: `Duplicate invoice ignored, matched with invoice ID: ${matched_invoice_id}`
+    });
 
     res.json({
       success: true,

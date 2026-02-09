@@ -105,7 +105,7 @@ const createTables = async () => {
         user_id INTEGER NOT NULL REFERENCES users(id),
         action VARCHAR(100) NOT NULL,
         timestamp TIMESTAMP DEFAULT NOW(),
-        details JSONB
+        details TEXT
       )
     `);
 

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Download, FileText } from 'lucide-react';
+import { Loader2, Download, FileText, Upload, FileCheck } from 'lucide-react';
 
 const InvoiceDetail = () => {
   const { id } = useParams();
@@ -43,6 +43,18 @@ const InvoiceDetail = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to identify document type
+  const getDocumentType = (doc, invoiceData) => {
+    if (!doc || !invoiceData) return 'uploaded';
+    
+    // Check if this document is the generated PDF
+    if (invoiceData.generated_pdf_document_id && doc.document_id === invoiceData.generated_pdf_document_id) {
+      return 'generated';
+    }
+    
+    return 'uploaded';
   };
 
   const handleGeneratePdf = async () => {
@@ -154,7 +166,7 @@ const InvoiceDetail = () => {
                   <CardTitle className="text-lg">Documents</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-muted rounded-lg overflow-hidden mb-4" style={{ minHeight: '400px' }}>
+                  <div className="bg-muted rounded-lg overflow-hidden mb-2" style={{ minHeight: '400px' }}>
                     {documents[currentDocIndex]?.content_type === 'application/pdf' ? (
                       <div className="flex flex-col items-center justify-center p-8 min-h-[400px]">
                         <svg className="w-32 h-32 text-red-500 mb-4" fill="currentColor" viewBox="0 0 24 24">
@@ -182,6 +194,28 @@ const InvoiceDetail = () => {
                       />
                     )}
                   </div>
+                  
+                  {/* Document Type Label */}
+                  {documents[currentDocIndex] && (
+                    <div className="mb-4 flex items-center justify-center gap-2">
+                      {getDocumentType(documents[currentDocIndex], invoice) === 'generated' ? (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
+                          <FileCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                            Generated PDF
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                          <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                            Original Upload
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   {documents.length > 1 && (
                     <div className="flex justify-between items-center">
                       <Button

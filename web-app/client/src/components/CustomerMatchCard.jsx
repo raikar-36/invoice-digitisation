@@ -1,9 +1,11 @@
 import React from 'react';
 import { formatDate } from '../utils/dateFormatter';
-import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, FileText, IndianRupee, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange }) => {
+const CustomerMatchCard = ({ customer, selectedOption, onOptionChange }) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -16,11 +18,14 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
   return (
     <Card className="bg-emerald-500/5 border-border/50 mb-4">
       <CardContent className="pt-6">
+        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-lg font-semibold tracking-tight text-emerald-800 dark:text-emerald-300">Existing Customer Found</h3>
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h3 className="text-lg font-semibold tracking-tight text-emerald-800 dark:text-emerald-300">
+                Existing Customer Found
+              </h3>
             </div>
             <p className="text-sm text-muted-foreground">
               This customer already exists in your database
@@ -28,10 +33,9 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
           </div>
         </div>
 
-        {/* Customer Details */}
-        <Card className="mb-4">
-          <CardContent className="pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Customer Details - Flattened Structure */}
+        <div className="border rounded-lg p-4 mb-4 bg-background">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             <div>
               <span className="text-xs text-muted-foreground uppercase">Name</span>
               <p className="font-semibold tracking-tight">{customer.name || 'N/A'}</p>
@@ -56,43 +60,58 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
             )}
           </div>
 
-          {/* Purchase Statistics */}
-          <div className="mt-4 pt-4 border-t">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-blue-600">
-                  {customer.invoice_count || 0}
+          {/* Purchase Statistics with Icons */}
+          <div className="pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div className="text-xs text-muted-foreground uppercase">Invoices</div>
+                <div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {customer.invoice_count || 0}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Invoices</div>
+                </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-emerald-600">
-                  {formatCurrency(customer.lifetime_value)}
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <IndianRupee className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <div className="text-xs text-muted-foreground uppercase">Total Value</div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(customer.lifetime_value)}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Lifetime Value</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-bold text-purple-600">
-                  {formatDate(customer.last_purchase)}
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
-                <div className="text-xs text-muted-foreground uppercase">Last Purchase</div>
+                <div>
+                  <div className="text-sm font-bold text-foreground">
+                    {formatDate(customer.last_purchase)}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase">Last Purchase</div>
+                </div>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-        {/* Selection Options */}
-        <div className="space-y-3">
-          <label className="flex items-start gap-3 p-3 bg-background rounded-lg border-2 cursor-pointer hover:border-emerald-500 transition-colors">
-            <input
-              type="radio"
-              name="customerSelection"
-              value="existing"
-              checked={selectedOption === 'existing'}
-              onChange={() => onOptionChange('existing')}
-              className="mt-1 w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-            />
+        {/* Selection Options with Shadcn RadioGroup */}
+        <RadioGroup value={selectedOption} onValueChange={onOptionChange} className="space-y-3">
+          {/* Existing Customer Option */}
+          <label
+            htmlFor="existing"
+            className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+              selectedOption === 'existing'
+                ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20'
+                : 'border-border hover:border-emerald-300'
+            }`}
+          >
+            <RadioGroupItem value="existing" id="existing" className="mt-1" />
             <div className="flex-1">
               <div className="font-semibold tracking-tight">Use this existing customer</div>
               <div className="text-sm text-muted-foreground">
@@ -101,15 +120,16 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
             </div>
           </label>
 
-          <label className="flex items-start gap-3 p-3 bg-background rounded-lg border-2 cursor-pointer hover:border-amber-500 transition-colors">
-            <input
-              type="radio"
-              name="customerSelection"
-              value="different"
-              checked={selectedOption === 'different'}
-              onChange={() => onOptionChange('different')}
-              className="mt-1 w-4 h-4 text-amber-600 focus:ring-amber-500"
-            />
+          {/* Different Customer Option */}
+          <label
+            htmlFor="different"
+            className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+              selectedOption === 'different'
+                ? 'border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/20'
+                : 'border-border hover:border-amber-300'
+            }`}
+          >
+            <RadioGroupItem value="different" id="different" className="mt-1" />
             <div className="flex-1">
               <div className="font-semibold tracking-tight">This is a different customer</div>
               <div className="text-sm text-muted-foreground">
@@ -117,22 +137,16 @@ const CustomerMatchCard = ({ customer, onSelect, selectedOption, onOptionChange 
               </div>
             </div>
           </label>
-        </div>
+        </RadioGroup>
 
+        {/* Compact Warning for Different Option */}
         {selectedOption === 'different' && (
-          <Card className="mt-3 bg-amber-500/5 border-border/50">
-            <CardContent className="py-3">
-              <div className="flex gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <div>
-                  <div className="font-semibold tracking-tight text-amber-800 dark:text-amber-300">Warning: Potential Duplicate</div>
-                  <div className="text-sm text-muted-foreground">
-                    Phone number already exists. Please confirm this is a different customer before proceeding.
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Alert variant="warning" className="mt-3 bg-amber-500/10 border-amber-500/30">
+            <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+              <span className="font-semibold">Warning:</span> Phone number already exists. 
+              Please confirm this is a different customer before proceeding.
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
     </Card>

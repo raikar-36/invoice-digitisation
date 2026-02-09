@@ -67,13 +67,16 @@ const DuplicateInvoiceAlert = ({
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel} autoFocus>
+          <AlertDialogCancel 
+            onClick={onCancel} 
+            autoFocus
+            className="bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100"
+          >
             Cancel & Review
           </AlertDialogCancel>
           <AlertDialogAction 
             onClick={onProceed}
-            variant="ghost" 
-            className="text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/20"
+            className="bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-600 dark:hover:bg-amber-700"
           >
             Ignore & Submit
           </AlertDialogAction>

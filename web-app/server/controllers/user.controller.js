@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { getPostgresPool } = require('../config/database');
 const auditService = require('../services/audit.service');
+const auditHelper = require('../utils/auditHelper');
 
 exports.createUser = async (req, res) => {
   try {
@@ -49,15 +50,15 @@ exports.createUser = async (req, res) => {
 
     const newUser = result.rows[0];
 
-    // Log audit
+    // Log audit with comprehensive details
     await auditService.log({
       userId: req.user.userId,
       action: 'USER_CREATED',
-      details: {
-        created_user_id: newUser.id,
+      details: auditHelper.createUserAuditDetails('USER_CREATED', {
         email: newUser.email,
-        role: newUser.role
-      }
+        role: newUser.role,
+        name: newUser.name
+      })
     });
 
     res.status(201).json({
@@ -134,14 +135,14 @@ exports.deactivateUser = async (req, res) => {
       ['INACTIVE', id]
     );
 
-    // Log audit
+    // Log audit with comprehensive details
     await auditService.log({
       userId: currentUserId,
       action: 'USER_DEACTIVATED',
-      details: {
-        deactivated_user_id: parseInt(id),
-        email: userCheck.rows[0].email
-      }
+      details: auditHelper.createUserAuditDetails('USER_DEACTIVATED', {
+        email: userCheck.rows[0].email,
+        name: userCheck.rows[0].name
+      })
     });
 
     res.json({
@@ -198,16 +199,16 @@ exports.changeUserRole = async (req, res) => {
       [role, id]
     );
 
-    // Log audit
+    // Log audit with comprehensive details
     await auditService.log({
       userId: currentUserId,
-      action: 'USER_ROLE_CHANGED',
-      details: {
-        user_id: parseInt(id),
+      action: 'ROLE_CHANGED',
+      details: auditHelper.createUserAuditDetails('ROLE_CHANGED', {
         email: userCheck.rows[0].email,
-        old_role: userCheck.rows[0].old_role,
-        new_role: role
-      }
+        name: userCheck.rows[0].name,
+        previousRole: userCheck.rows[0].role,
+        newRole: role
+      })
     });
 
     res.json({
