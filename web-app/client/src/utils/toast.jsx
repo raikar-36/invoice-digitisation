@@ -31,14 +31,4 @@ export const showToast = {
   },
 };
 
-// Confirmation dialog - Note: For confirmation dialogs, use AlertDialog component from shadcn instead
-export const confirmAction = (message, onConfirm) => {
-  // This is deprecated - use AlertDialog component for confirmations
-  console.warn('confirmAction is deprecated. Please use AlertDialog component from shadcn/ui');
-  const confirmed = window.confirm(message);
-  if (confirmed) {
-    onConfirm();
-  }
-};
-
 export default showToast;

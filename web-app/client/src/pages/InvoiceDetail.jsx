@@ -3,11 +3,12 @@ import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { invoiceAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { showToast, confirmAction } from '../utils/toast.jsx';
+import { showToast } from '../utils/toast.jsx';
 import { formatDate } from '../utils/dateFormatter';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, Download, FileText } from 'lucide-react';
 
 const InvoiceDetail = () => {
@@ -18,6 +19,7 @@ const InvoiceDetail = () => {
   const [currentDocIndex, setCurrentDocIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [showGeneratePdfDialog, setShowGeneratePdfDialog] = useState(false);
 
   useEffect(() => {
     loadInvoice();
@@ -44,20 +46,23 @@ const InvoiceDetail = () => {
   };
 
   const handleGeneratePdf = async () => {
-    confirmAction('Generate PDF for this invoice?', async () => {
-      try {
-        setGeneratingPdf(true);
-        const response = await invoiceAPI.generatePdf(id);
-        showToast.success('PDF generated successfully!');
-        // Reload invoice to get updated PDF info
-        await loadInvoice();
-      } catch (error) {
-        console.error('Failed to generate PDF:', error);
-        showToast.error(error.response?.data?.message || 'Failed to generate PDF');
-      } finally {
-        setGeneratingPdf(false);
-      }
-    });
+    setShowGeneratePdfDialog(true);
+  };
+  
+  const confirmGeneratePdf = async () => {
+    try {
+      setGeneratingPdf(true);
+      const response = await invoiceAPI.generatePdf(id);
+      showToast.success('PDF generated successfully!');
+      // Reload invoice to get updated PDF info
+      await loadInvoice();
+      setShowGeneratePdfDialog(false);
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      showToast.error(error.response?.data?.message || 'Failed to generate PDF');
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -309,6 +314,43 @@ const InvoiceDetail = () => {
           </div>
         </div>
       </motion.div>
+      
+      {/* Generate PDF Confirmation Dialog */}
+      <AlertDialog open={showGeneratePdfDialog} onOpenChange={setShowGeneratePdfDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="rounded-full bg-primary/10 p-2">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <AlertDialogTitle className="text-xl font-semibold tracking-tight">
+                Generate PDF
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Are you sure you want to generate a PDF for invoice <strong className="font-mono">#{invoice?.invoice_number}</strong>?
+              <br />
+              This will create a professional invoice document that can be downloaded and shared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={generatingPdf}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmGeneratePdf}
+              disabled={generatingPdf}
+            >
+              {generatingPdf ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Generate PDF'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

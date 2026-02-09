@@ -1,45 +1,84 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileCheck, Loader2, Trash2, ArrowRight, Calendar, DollarSign, FileText, AlertTriangle } from 'lucide-react';
 import { invoiceAPI } from '../services/api';
 import { showToast } from '../utils/toast.jsx';
 import { formatDate } from '../utils/dateFormatter';
+import { useAuth } from '@/contexts/AuthContext';
+import { filterInvoicesByCreator, sortInvoices, getCreatorsFromInvoices } from '@/utils/invoiceUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis } from '@/components/ui/pagination';
+import CreatorFilter from '@/components/CreatorFilter';
+import InvoiceSort from '@/components/InvoiceSort';
 
 const ReviewInvoices = () => {
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState([]);
+  const { user } = useAuth();
+  const [allInvoices, setAllInvoices] = useState([]); // All fetched invoices
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Client-side filters
+  const [creatorFilter, setCreatorFilter] = useState('all');
+  const [sortOption, setSortOption] = useState(sessionStorage.getItem('sort_review') || 'created_desc');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
 
+  // Fetch all invoices once on mount
   useEffect(() => {
     fetchPendingReviewInvoices();
+  }, []);
+  
+  // Clear filters when component unmounts
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem('filter_review_creator');
+    };
   }, []);
 
   const fetchPendingReviewInvoices = async () => {
     try {
       setLoading(true);
-      // Fetch invoices with PENDING_REVIEW status
-      const response = await invoiceAPI.getAll({ status: 'PENDING_REVIEW' });
-      setInvoices(response.data);
+      // Fetch all invoices, filter client-side
+      const response = await invoiceAPI.getAll();
+      // Filter for PENDING_REVIEW status client-side
+      const reviewInvoices = response.data.filter(inv => inv.status === 'PENDING_REVIEW');
+      setAllInvoices(reviewInvoices);
     } catch (err) {
       setError('Failed to fetch invoices for review');
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Get creators list from fetched invoices
+  const creators = useMemo(() => getCreatorsFromInvoices(allInvoices), [allInvoices]);
+  
+  // Apply client-side filtering and sorting
+  const processedInvoices = useMemo(() => {
+    let filtered = filterInvoicesByCreator(allInvoices, creatorFilter, user?.id);
+    let sorted = sortInvoices(filtered, sortOption);
+    return sorted;
+  }, [allInvoices, creatorFilter, sortOption, user]);
+  
+  const handleCreatorFilterChange = (filterValue) => {
+    setCreatorFilter(filterValue);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+  
+  const handleSortChange = (sortValue) => {
+    setSortOption(sortValue);
+    setCurrentPage(1); // Reset to first page when sort changes
   };
 
   const handleReviewClick = (invoiceId) => {
@@ -70,11 +109,11 @@ const ReviewInvoices = () => {
     }
   };
 
-  // Pagination logic
+  // Pagination logic (applied to processed invoices)
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentInvoices = invoices.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(invoices.length / itemsPerPage);
+  const currentInvoices = processedInvoices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(processedInvoices.length / itemsPerPage);
 
   const generatePageNumbers = () => {
     const pages = [];
@@ -117,10 +156,19 @@ const ReviewInvoices = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Review Queue</h1>
-        <p className="text-muted-foreground mt-2">
-          Review and correct invoice data extracted by OCR before submitting for approval
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Review Queue</h1>
+            <p className="text-muted-foreground mt-2">
+              Review and correct invoice data extracted by OCR before submitting for approval
+            </p>
+          </div>
+          <CreatorFilter 
+            creators={creators}
+            onFilterChange={handleCreatorFilterChange}
+            storageKey="filter_review_creator"
+          />
+        </div>
       </div>
 
       {error && (
@@ -129,7 +177,7 @@ const ReviewInvoices = () => {
         </div>
       )}
 
-      {invoices.length === 0 ? (
+      {processedInvoices.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -148,8 +196,14 @@ const ReviewInvoices = () => {
         </motion.div>
       ) : (
         <>
-          <div className="mb-4 text-sm text-muted-foreground">
-            Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, processedInvoices.length)} of {processedInvoices.length} invoices
+            </div>
+            <InvoiceSort 
+              onSortChange={handleSortChange}
+              storageKey="sort_review"
+            />
           </div>
 
           {/* Bento Grid Layout */}

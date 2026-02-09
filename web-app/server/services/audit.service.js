@@ -39,10 +39,12 @@ exports.getAllAudit = async (filters = {}) => {
     const pool = getPostgresPool();
     let query = `
       SELECT 
-        al.id, al.invoice_id, al.action, al.timestamp, al.details,
-        u.name as user_name, u.email as user_email
+        al.id, al.invoice_id, al.user_id, al.action, al.timestamp, al.details,
+        u.name as user_name, u.email as user_email,
+        i.invoice_number
       FROM audit_log al
       JOIN users u ON al.user_id = u.id
+      LEFT JOIN invoices i ON al.invoice_id = i.id
       WHERE 1=1
     `;
     

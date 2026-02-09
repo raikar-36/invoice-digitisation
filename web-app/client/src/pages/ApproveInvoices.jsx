@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Loader2, XCircle, Eye, AlertTriangle } from 'lucide-react';
@@ -6,6 +6,8 @@ import { invoiceAPI } from '../services/api';
 import { showToast } from '../utils/toast.jsx';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatDate } from '../utils/dateFormatter';
+import { useAuth } from '@/contexts/AuthContext';
+import { filterInvoicesByCreator, sortInvoices, getCreatorsFromInvoices } from '@/utils/invoiceUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,10 +15,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis } from '@/components/ui/pagination';
+import CreatorFilter from '@/components/CreatorFilter';
+import InvoiceSort from '@/components/InvoiceSort';
 
 const ApproveInvoices = () => {
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState([]);
+  const { user } = useAuth();
+  const [allInvoices, setAllInvoices] = useState([]); // All fetched invoices
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -28,22 +33,57 @@ const ApproveInvoices = () => {
   const [rejecting, setRejecting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
+  
+  // Client-side filters
+  const [creatorFilter, setCreatorFilter] = useState('all');
+  const [sortOption, setSortOption] = useState(sessionStorage.getItem('sort_approval') || 'created_desc');
 
+  // Fetch all invoices once on mount
   useEffect(() => {
     fetchPendingApprovalInvoices();
+  }, []);
+  
+  // Clear filters when component unmounts
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem('filter_approval_creator');
+    };
   }, []);
 
   const fetchPendingApprovalInvoices = async () => {
     try {
       setLoading(true);
-      const response = await invoiceAPI.getAll({ status: 'PENDING_APPROVAL' });
-      setInvoices(response.data);
+      // Fetch all invoices, filter client-side
+      const response = await invoiceAPI.getAll();
+      // Filter for PENDING_APPROVAL status client-side
+      const approvalInvoices = response.data.filter(inv => inv.status === 'PENDING_APPROVAL');
+      setAllInvoices(approvalInvoices);
     } catch (err) {
       setError('Failed to fetch invoices for approval');
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Get creators list from fetched invoices
+  const creators = useMemo(() => getCreatorsFromInvoices(allInvoices), [allInvoices]);
+  
+  // Apply client-side filtering and sorting
+  const processedInvoices = useMemo(() => {
+    let filtered = filterInvoicesByCreator(allInvoices, creatorFilter, user?.id);
+    let sorted = sortInvoices(filtered, sortOption);
+    return sorted;
+  }, [allInvoices, creatorFilter, sortOption, user]);
+  
+  const handleCreatorFilterChange = (filterValue) => {
+    setCreatorFilter(filterValue);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+  
+  const handleSortChange = (sortValue) => {
+    setSortOption(sortValue);
+    setCurrentPage(1); // Reset to first page when sort changes
   };
 
   const handleApproveClick = (invoice) => {
@@ -114,11 +154,11 @@ const ApproveInvoices = () => {
     navigate(`/dashboard/invoices/${invoiceId}`);
   };
 
-  // Pagination logic
+  // Pagination logic (applied to processed invoices)
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentInvoices = invoices.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(invoices.length / itemsPerPage);
+  const currentInvoices = processedInvoices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(processedInvoices.length / itemsPerPage);
 
   const generatePageNumbers = () => {
     const pages = [];
@@ -161,10 +201,19 @@ const ApproveInvoices = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Approval Queue</h1>
-        <p className="text-muted-foreground mt-2">
-          Review and approve invoices that have been submitted by staff
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Approval Queue</h1>
+            <p className="text-muted-foreground mt-2">
+              Review and approve invoices that have been submitted by staff
+            </p>
+          </div>
+          <CreatorFilter 
+            creators={creators}
+            onFilterChange={handleCreatorFilterChange}
+            storageKey="filter_approval_creator"
+          />
+        </div>
       </div>
 
       {error && (
@@ -173,7 +222,7 @@ const ApproveInvoices = () => {
         </div>
       )}
 
-      {invoices.length === 0 ? (
+      {processedInvoices.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -192,8 +241,14 @@ const ApproveInvoices = () => {
         </motion.div>
       ) : (
         <>
-          <div className="mb-4 text-sm text-muted-foreground">
-            Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, processedInvoices.length)} of {processedInvoices.length} invoices
+            </div>
+            <InvoiceSort 
+              onSortChange={handleSortChange}
+              storageKey="sort_approval"
+            />
           </div>
 
           <div className="grid gap-6">

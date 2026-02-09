@@ -17,6 +17,9 @@ router.post('/upload',
 // Get invoices with filtering
 router.get('/', invoiceController.getInvoices);
 
+// Get creators list with counts for filtering
+router.get('/creators', authorize('OWNER'), invoiceController.getCreatorsList);
+
 // Get single invoice with details
 router.get('/:id', invoiceController.getInvoiceById);
 

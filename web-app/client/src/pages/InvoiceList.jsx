@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { User, DollarSign, Trash2, FileText, Inbox, Loader2 } from 'lucide-react';
 import { invoiceAPI, authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { showToast, confirmAction } from '../utils/toast';
+import { showToast } from '../utils/toast';
 import { formatDate } from '../utils/dateFormatter';
+import { filterInvoicesByCreator, sortInvoices, getCreatorsFromInvoices } from '@/utils/invoiceUtils';
 import PasswordConfirmModal from '../components/PasswordConfirmModal';
+import CreatorFilter from '@/components/CreatorFilter';
+import InvoiceSort from '@/components/InvoiceSort';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,14 +50,18 @@ const StatusBadge = ({ status }) => {
 
 const InvoiceList = () => {
   const { user } = useAuth();
-  const [invoices, setInvoices] = useState([]);
+  const [allInvoices, setAllInvoices] = useState([]); // All fetched invoices
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    dateFrom: '',
-    dateTo: ''
-  });
+  
+  // All filters are now client-side
+  const [searchFilter, setSearchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dateFromFilter, setDateFromFilter] = useState('');
+  const [dateToFilter, setDateToFilter] = useState('');
+  
+  // Client-side filters
+  const [creatorFilter, setCreatorFilter] = useState('all');
+  const [sortOption, setSortOption] = useState(sessionStorage.getItem('sort_invoices') || 'created_desc');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,34 +70,114 @@ const InvoiceList = () => {
   // Delete modal
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
+  
+  // Clear filters when component unmounts
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem('filter_invoices_creator');
+    };
+  }, []);
 
+  // Load invoices once on mount
   useEffect(() => {
     loadInvoices();
-  }, [filters]);
+  }, []);
 
   const loadInvoices = async () => {
     try {
-      const response = await invoiceAPI.getAll(filters);
+      // Fetch all invoices - no server-side filtering
+      const response = await invoiceAPI.getAll();
       // Backend returns array directly
       const invoiceData = Array.isArray(response.data) ? response.data : response.data.invoices || [];
-      setInvoices(invoiceData);
+      setAllInvoices(invoiceData);
     } catch (error) {
       console.error('Failed to load invoices:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setCurrentPage(1); // Reset to first page when filters change
+  
+  // Get creators list from fetched invoices
+  const creators = useMemo(() => getCreatorsFromInvoices(allInvoices), [allInvoices]);
+  
+  // Apply ALL client-side filtering and sorting
+  const processedInvoices = useMemo(() => {
+    let filtered = [...allInvoices];
+    
+    // Apply search filter
+    if (searchFilter) {
+      const search = searchFilter.toLowerCase();
+      filtered = filtered.filter(inv => 
+        (inv.invoice_number && inv.invoice_number.toLowerCase().includes(search)) ||
+        (inv.customer_name && inv.customer_name.toLowerCase().includes(search))
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter) {
+      filtered = filtered.filter(inv => inv.status === statusFilter);
+    }
+    
+    // Apply date range filters
+    if (dateFromFilter) {
+      filtered = filtered.filter(inv => {
+        const invDate = new Date(inv.invoice_date);
+        const fromDate = new Date(dateFromFilter);
+        return invDate >= fromDate;
+      });
+    }
+    
+    if (dateToFilter) {
+      filtered = filtered.filter(inv => {
+        const invDate = new Date(inv.invoice_date);
+        const toDate = new Date(dateToFilter);
+        return invDate <= toDate;
+      });
+    }
+    
+    // Apply creator filter
+    filtered = filterInvoicesByCreator(filtered, creatorFilter, user?.id);
+    
+    // Apply sorting
+    let sorted = sortInvoices(filtered, sortOption);
+    return sorted;
+  }, [allInvoices, creatorFilter, sortOption, searchFilter, statusFilter, dateFromFilter, dateToFilter, user]);
+  
+  const handleCreatorFilterChange = (filterValue) => {
+    setCreatorFilter(filterValue);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+  
+  const handleSortChange = (sortValue) => {
+    setSortOption(sortValue);
+    setCurrentPage(1); // Reset to first page when sort changes
   };
 
-  // Pagination logic
+  const handleSearchChange = (value) => {
+    setSearchFilter(value);
+    setCurrentPage(1);
+  };
+  
+  const handleStatusChange = (value) => {
+    setStatusFilter(value === 'ALL' ? '' : value);
+    setCurrentPage(1);
+  };
+  
+  const handleDateFromChange = (value) => {
+    setDateFromFilter(value);
+    setCurrentPage(1);
+  };
+  
+  const handleDateToChange = (value) => {
+    setDateToFilter(value);
+    setCurrentPage(1);
+  };
+
+  // Pagination logic (applied to processed invoices)
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentInvoices = invoices.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(invoices.length / itemsPerPage);
+  const currentInvoices = processedInvoices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(processedInvoices.length / itemsPerPage);
 
   const generatePageNumbers = () => {
     const pages = [];
@@ -163,6 +250,18 @@ const InvoiceList = () => {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Invoices</h1>
+        <div className="flex items-center gap-3">
+          <CreatorFilter 
+            creators={creators}
+            onFilterChange={handleCreatorFilterChange}
+            storageKey="filter_invoices_creator"
+          />
+          <InvoiceSort 
+            onSortChange={handleSortChange}
+            includeStatus={true}
+            storageKey="sort_invoices"
+          />
+        </div>
       </div>
 
       {/* Filters */}
@@ -173,13 +272,13 @@ const InvoiceList = () => {
               <Input
                 type="text"
                 placeholder="Search invoice or customer..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+                value={searchFilter}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
             
             <div>
-              <Select value={filters.status || "ALL"} onValueChange={(value) => handleFilterChange('status', value === "ALL" ? "" : value)}>
+              <Select value={statusFilter || "ALL"} onValueChange={handleStatusChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
@@ -196,8 +295,8 @@ const InvoiceList = () => {
             <div className="relative">
               <Label htmlFor="dateFrom" className="absolute -top-2 left-2 bg-background px-1 text-xs font-medium z-10">From</Label>
               <DatePicker
-                value={filters.dateFrom}
-                onChange={(date) => handleFilterChange('dateFrom', date)}
+                value={dateFromFilter}
+                onChange={handleDateFromChange}
                 placeholder="From date"
               />
             </div>
@@ -205,8 +304,8 @@ const InvoiceList = () => {
             <div className="relative">
               <Label htmlFor="dateTo" className="absolute -top-2 left-2 bg-background px-1 text-xs font-medium z-10">To</Label>
               <DatePicker
-                value={filters.dateTo}
-                onChange={(date) => handleFilterChange('dateTo', date)}
+                value={dateToFilter}
+                onChange={handleDateToChange}
                 placeholder="To date"
               />
             </div>
@@ -215,7 +314,7 @@ const InvoiceList = () => {
       </Card>
 
       {/* Invoice Grid */}
-      {invoices.length === 0 ? (
+      {processedInvoices.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent className="pt-6">
             <Inbox className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
@@ -226,7 +325,7 @@ const InvoiceList = () => {
       ) : (
         <>
           <div className="mb-4 text-sm text-muted-foreground">
-            Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, invoices.length)} of {invoices.length} invoices
+            Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, processedInvoices.length)} of {processedInvoices.length} invoices
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

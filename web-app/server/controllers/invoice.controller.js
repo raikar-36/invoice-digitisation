@@ -181,7 +181,7 @@ exports.uploadInvoice = async (req, res) => {
 
 exports.getInvoices = async (req, res) => {
   try {
-    const { status, search, dateFrom, dateTo, minAmount, maxAmount } = req.query;
+    const { status, search, dateFrom, dateTo, minAmount, maxAmount, createdBy } = req.query;
     const userId = req.user.userId;
     const userRole = req.user.role;
 
@@ -191,7 +191,7 @@ exports.getInvoices = async (req, res) => {
       SELECT 
         i.id, i.invoice_number, i.invoice_date, i.total_amount, 
         i.status, i.created_at, i.generated_pdf_document_id,
-        i.submitted_at, i.rejection_reason,
+        i.submitted_at, i.rejection_reason, i.created_by,
         c.name as customer_name, c.phone as customer_phone,
         u.name as created_by_name,
         s.name as submitted_by_name
@@ -204,47 +204,13 @@ exports.getInvoices = async (req, res) => {
     
     const params = [];
 
-    // Apply filters first
-    if (status) {
-      params.push(status);
-      query += ` AND i.status = $${params.length}`;
-    }
-
-    // Role-based filtering (only if no explicit status filter)
-    if (!status && userRole === 'ACCOUNTANT') {
-      // Accountants can only see approved invoices
-      params.push('APPROVED');
-      query += ` AND i.status = $${params.length}`;
-    } else if (!status && userRole === 'STAFF') {
-      // Staff can ONLY see their own invoices (all statuses)
+    // Role-based filtering ONLY (security requirement)
+    if (userRole === 'STAFF' || userRole === 'ACCOUNTANT') {
+      // Staff and Accountants can ONLY see their own invoices
       params.push(userId);
       query += ` AND i.created_by = $${params.length}`;
     }
-
-    if (search) {
-      params.push(`%${search}%`);
-      query += ` AND (i.invoice_number ILIKE $${params.length} OR c.name ILIKE $${params.length})`;
-    }
-
-    if (dateFrom) {
-      params.push(dateFrom);
-      query += ` AND i.invoice_date >= $${params.length}`;
-    }
-
-    if (dateTo) {
-      params.push(dateTo);
-      query += ` AND i.invoice_date <= $${params.length}`;
-    }
-
-    if (minAmount) {
-      params.push(minAmount);
-      query += ` AND i.total_amount >= $${params.length}`;
-    }
-
-    if (maxAmount) {
-      params.push(maxAmount);
-      query += ` AND i.total_amount <= $${params.length}`;
-    }
+    // For OWNER: fetch ALL invoices, filtering done client-side
 
     query += ' ORDER BY i.created_at DESC';
 
@@ -285,6 +251,55 @@ exports.getInvoices = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get invoices'
+    });
+  }
+};
+
+// Get list of creators with invoice counts for a specific status
+exports.getCreatorsList = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const userRole = req.user.role;
+
+    // Only OWNER can access this endpoint
+    if (userRole !== 'OWNER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only owners can view creator filters.'
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status parameter is required'
+      });
+    }
+
+    const pool = getPostgresPool();
+    
+    // Get all users who have created invoices with the specified status
+    const query = `
+      SELECT 
+        u.id,
+        u.name,
+        COUNT(i.id) as count
+      FROM users u
+      INNER JOIN invoices i ON i.created_by = u.id
+      WHERE i.status = $1
+      GROUP BY u.id, u.name
+      HAVING COUNT(i.id) > 0
+      ORDER BY u.name ASC
+    `;
+
+    const result = await pool.query(query, [status]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get creators list error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get creators list'
     });
   }
 };

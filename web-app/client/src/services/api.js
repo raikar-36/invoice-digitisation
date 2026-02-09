@@ -44,7 +44,8 @@ export const invoiceAPI = {
   downloadDocument: (invoiceId, documentId) => 
     api.get(`/invoices/${invoiceId}/documents/${documentId}`, { responseType: 'blob' }),
   checkDuplicate: (data) => api.post('/invoices/check-duplicate', data),
-  logDuplicateIgnored: (data) => api.post('/invoices/log-duplicate-ignored', data)
+  logDuplicateIgnored: (data) => api.post('/invoices/log-duplicate-ignored', data),
+  getCreatorsList: (params) => api.get('/invoices/creators', { params })
 };
 
 // Customer endpoints

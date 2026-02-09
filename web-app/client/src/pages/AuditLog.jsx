@@ -63,33 +63,37 @@ const AuditLog = () => {
     let filtered = [...auditLogs];
 
     // Filter by user
-    if (selectedUser) {
-      filtered = filtered.filter(log => log.user_id === parseInt(selectedUser));
+    if (selectedUser && selectedUser !== '') {
+      const userId = parseInt(selectedUser);
+      filtered = filtered.filter(log => log.user_id === userId);
     }
 
     // Filter by action
-    if (selectedAction) {
+    if (selectedAction && selectedAction !== '') {
       filtered = filtered.filter(log => log.action === selectedAction);
     }
 
     // Filter by date range
-    if (startDate) {
+    if (startDate && startDate !== '') {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
       filtered = filtered.filter(log => 
-        new Date(log.timestamp) >= new Date(startDate)
+        new Date(log.timestamp) >= start
       );
     }
-    if (endDate) {
+    if (endDate && endDate !== '') {
       const end = new Date(endDate);
-      end.setHours(23, 59, 59);
+      end.setHours(23, 59, 59, 999);
       filtered = filtered.filter(log => 
         new Date(log.timestamp) <= end
       );
     }
 
     // Filter by invoice number
-    if (searchInvoice) {
+    if (searchInvoice && searchInvoice.trim() !== '') {
+      const search = searchInvoice.toLowerCase().trim();
       filtered = filtered.filter(log => 
-        log.details?.invoice_number?.toLowerCase().includes(searchInvoice.toLowerCase())
+        log.invoice_number?.toLowerCase().includes(search)
       );
     }
 
@@ -179,7 +183,7 @@ const AuditLog = () => {
                 <SelectTrigger>
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[240px] overflow-y-auto">
                   <SelectItem value="ALL">All Users</SelectItem>
                   {users.map(user => (
                     <SelectItem key={user.id} value={user.id.toString()}>
@@ -321,7 +325,7 @@ const AuditLog = () => {
                               href={`/dashboard/invoices/${log.invoice_id}`}
                               className="text-primary hover:underline font-medium"
                             >
-                              #{log.invoice_id}
+                              {log.invoice_number || `#${log.invoice_id}`}
                             </a>
                           ) : (
                             <span className="text-muted-foreground">-</span>

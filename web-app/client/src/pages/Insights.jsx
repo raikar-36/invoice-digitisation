@@ -9,6 +9,12 @@ import {
 import { 
   Button 
 } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -119,10 +125,213 @@ const Insights = () => {
     setRefreshing(false);
   };
 
-  const handleExport = () => {
+  const handleExportPDF = async () => {
     if (!data) return;
     
     try {
+      // Determine date range
+      let dateRangeText = '';
+      const today = new Date();
+      
+      if (customStart && customEnd) {
+        dateRangeText = `Date Range: ${format(new Date(customStart), 'dd/MM/yyyy')} to ${format(new Date(customEnd), 'dd/MM/yyyy')}`;
+      } else if (dateRange === '7') {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 7);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else if (dateRange === '30') {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 30);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else if (dateRange === '90') {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 90);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else if (dateRange === '365') {
+        const startDate = new Date(today.getFullYear(), 0, 1);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else {
+        dateRangeText = 'Date Range: All Time';
+      }
+      
+      // Dynamically import jsPDF
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      let yPos = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // Title
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Smart Invoice Analytics Report', margin, yPos);
+      yPos += 10;
+      
+      // Date Range
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100);
+      doc.text(`Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, margin, yPos);
+      yPos += 5;
+      doc.text(dateRangeText, margin, yPos);
+      yPos += 12;
+      
+      // KPIs Section
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0);
+      doc.text('Key Performance Indicators', margin, yPos);
+      yPos += 8;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const kpis = [
+        ['Total Revenue', `Rs. ${parseFloat(data?.kpis?.total_revenue || 0).toLocaleString('en-IN')}`],
+        ['Total Invoices', data?.kpis?.total_invoices || 0],
+        ['Items Sold', data?.kpis?.total_items_sold || 0],
+        ['Unique Customers', data?.kpis?.unique_customers || 0],
+        ['Avg Items Per Invoice', parseFloat(data?.operationalMetrics?.avgItemsPerInvoice || 0).toFixed(2)],
+        ['Busiest Day', data?.operationalMetrics?.busiestDay || 'N/A'],
+        ['Most Active Customer', data?.operationalMetrics?.mostActiveCustomer || 'N/A']
+      ];
+      
+      kpis.forEach(([label, value]) => {
+        doc.text(`${label}:`, margin, yPos);
+        doc.text(String(value), margin + 70, yPos);
+        yPos += 5;
+      });
+      
+      yPos += 3;
+      
+      // Momentum Section
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Momentum (%)', margin, yPos);
+      yPos += 7;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const momentum = [
+        ['Revenue', `${data?.momentum?.revenue || 0}%`],
+        ['Invoices', `${data?.momentum?.invoices || 0}%`],
+        ['Items', `${data?.momentum?.items || 0}%`],
+        ['Customers', `${data?.momentum?.customers || 0}%`]
+      ];
+      
+      momentum.forEach(([label, value]) => {
+        doc.text(`${label}:`, margin, yPos);
+        doc.text(value, margin + 70, yPos);
+        yPos += 5;
+      });
+      
+      yPos += 3;
+      
+      // Top Customers Section
+      if (data?.topCustomersByRevenue?.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Top Customers by Revenue', margin, yPos);
+        yPos += 7;
+        
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        data.topCustomersByRevenue.slice(0, 10).forEach((customer, idx) => {
+          const text = `${idx + 1}. ${customer.name} - Rs. ${customer.value.toLocaleString('en-IN')} (${customer.count} invoices)`;
+          doc.text(text, margin, yPos);
+          yPos += 4.5;
+        });
+        
+        yPos += 3;
+      }
+      
+      // Status Distribution Section
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Invoice Status Distribution', margin, yPos);
+      yPos += 7;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      Object.entries(data?.statusDistribution || {}).forEach(([status, count]) => {
+        doc.text(`${status.replace('_', ' ').toUpperCase()}:`, margin, yPos);
+        doc.text(String(count), margin + 70, yPos);
+        yPos += 5;
+      });
+      
+      yPos += 3;
+      
+      // Monthly Revenue Section (2 columns to save space)
+      if (data?.yearlyRevenue?.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Monthly Revenue Trend', margin, yPos);
+        yPos += 7;
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        
+        // Split into 2 columns (6 months each)
+        const col1Data = data.yearlyRevenue.slice(0, 6);
+        const col2Data = data.yearlyRevenue.slice(6, 12);
+        const col2X = pageWidth / 2 + 10;
+        
+        let col1Y = yPos;
+        let col2Y = yPos;
+        
+        col1Data.forEach((item) => {
+          doc.text(`${item.month}:`, margin, col1Y);
+          doc.text(`Rs. ${item.revenue.toLocaleString('en-IN')}`, margin + 25, col1Y);
+          col1Y += 5;
+        });
+        
+        col2Data.forEach((item) => {
+          doc.text(`${item.month}:`, col2X, col2Y);
+          doc.text(`Rs. ${item.revenue.toLocaleString('en-IN')}`, col2X + 25, col2Y);
+          col2Y += 5;
+        });
+      }
+      
+      // Save the PDF
+      const timestamp = new Date().toISOString().split('T')[0];
+      doc.save(`invoice-analytics-${timestamp}.pdf`);
+      
+      console.log('PDF exported successfully');
+    } catch (error) {
+      console.error('PDF export failed:', error);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!data) return;
+    
+    try {
+      // Determine date range
+      let dateRangeText = '';
+      const today = new Date();
+      
+      if (customStart && customEnd) {
+        dateRangeText = `Date Range: ${format(new Date(customStart), 'dd/MM/yyyy')} to ${format(new Date(customEnd), 'dd/MM/yyyy')}`;
+      } else if (dateRange === '7') {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 7);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else if (dateRange === '30') {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 30);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else if (dateRange === '90') {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - 90);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else if (dateRange === '365') {
+        const startDate = new Date(today.getFullYear(), 0, 1);
+        dateRangeText = `Date Range: ${format(startDate, 'dd/MM/yyyy')} to ${format(today, 'dd/MM/yyyy')}`;
+      } else {
+        dateRangeText = 'Date Range: All Time';
+      }
+      
       // Prepare export data
       const exportData = {
         summary: {
@@ -143,7 +352,8 @@ const Insights = () => {
       // Convert to CSV format with UTF-8 BOM for proper encoding
       let csv = '\uFEFF'; // UTF-8 BOM
       csv += 'Smart Invoice Analytics Export\n';
-      csv += `Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}\n\n`;
+      csv += `Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}\n`;
+      csv += `${dateRangeText}\n\n`;
       
       // Summary Section
       csv += 'KEY PERFORMANCE INDICATORS\n';
@@ -192,8 +402,7 @@ const Insights = () => {
       link.click();
       document.body.removeChild(link);
       
-      // Show success message (if you have toast)
-      console.log('Analytics exported successfully');
+      console.log('CSV exported successfully');
     } catch (error) {
       console.error('Export failed:', error);
     }
@@ -270,14 +479,27 @@ const Insights = () => {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
           
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="rounded-lg"
-            onClick={handleExport}
-          >
-            <Download className="w-4 h-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-lg"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>
+                <Download className="w-4 h-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPDF}>
+                <Download className="w-4 h-4 mr-2" />
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
