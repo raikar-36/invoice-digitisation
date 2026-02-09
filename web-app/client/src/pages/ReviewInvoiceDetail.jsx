@@ -59,6 +59,7 @@ const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, clas
         step={step}
         value={value}
         onChange={onChange}
+        onWheel={(e) => e.target.blur()}
         placeholder={placeholder}
         className={`pr-16 ${className}`}
         {...props}
