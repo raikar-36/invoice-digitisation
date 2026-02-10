@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '../.env' });
 const bcrypt = require('bcryptjs');
 const { connectMongoDB, connectPostgres, getPostgresPool } = require('./config/database');
 const { createTables } = require('./config/schema');

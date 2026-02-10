@@ -1351,22 +1351,22 @@ exports.generatePdf = async (req, res) => {
       });
     }
 
-    // Get currency symbol helper
-    const getCurrencySymbol = (currency) => {
-      const symbols = {
-        'INR': '₹',
-        'USD': '$',
-        'EUR': '€',
-        'GBP': '£'
+    // Get currency text helper
+    const getCurrencyText = (currency) => {
+      const currencyNames = {
+        'INR': 'Rs',
+        'USD': 'USD',
+        'EUR': 'EUR',
+        'GBP': 'GBP'
       };
-      return symbols[currency] || currency;
+      return currencyNames[currency] || currency;
     };
 
     // Helper function for currency formatting
     const formatCurrency = (amount) => {
       const numAmount = parseFloat(amount || 0);
-      const currencySymbol = getCurrencySymbol(invoice.currency || 'INR');
-      return currencySymbol + ' ' + new Intl.NumberFormat('en-IN', {
+      const currencyText = getCurrencyText(invoice.currency || 'INR');
+      return currencyText + ' ' + new Intl.NumberFormat('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       }).format(numAmount);

@@ -187,6 +187,12 @@ const ReviewInvoiceDetail = () => {
       const inv = invoiceRes.data;
       const ocr = ocrRes.data?.normalized_ocr_json;
 
+      // Debug logging
+      console.log('Invoice data:', inv);
+      console.log('OCR data:', ocr);
+      console.log('OCR invoice date:', ocr?.invoice?.invoice_date);
+      console.log('OCR currency:', ocr?.invoice?.currency);
+
       // Helper to format date for input field (yyyy-mm-dd)
       const formatDateForInput = (dateStr) => {
         if (!dateStr) return '';
@@ -201,10 +207,10 @@ const ReviewInvoiceDetail = () => {
 
       setFormData({
         invoice_number: inv.invoice_number || ocr?.invoice?.invoice_number || '',
-        invoice_date: formatDateForInput(inv.invoice_date || ocr?.invoice?.invoice_date),
-        total_amount: inv.total_amount || ocr?.invoice?.total_amount || '',
-        tax_amount: inv.tax_amount || ocr?.invoice?.tax_amount || '',
-        discount_amount: inv.discount_amount || ocr?.invoice?.discount_amount || '',
+        invoice_date: formatDateForInput(inv.invoice_date || ocr?.invoice?.invoice_date || ocr?.invoice?.date),
+        total_amount: inv.total_amount || ocr?.invoice?.total_amount || ocr?.invoice?.total || '',
+        tax_amount: inv.tax_amount || ocr?.invoice?.tax_amount || ocr?.invoice?.tax || '',
+        discount_amount: inv.discount_amount || ocr?.invoice?.discount_amount || ocr?.invoice?.discount || '',
         currency: inv.currency || ocr?.invoice?.currency || 'INR',
         customer_name: ocr?.customer?.name || '',
         customer_phone: ocr?.customer?.phone || '',
