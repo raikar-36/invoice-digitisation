@@ -58,6 +58,7 @@ const InvoiceList = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
+  const [currencyFilter, setCurrencyFilter] = useState('');
   
   // Client-side filters
   const [creatorFilter, setCreatorFilter] = useState('all');
@@ -135,13 +136,18 @@ const InvoiceList = () => {
       });
     }
     
+    // Apply currency filter
+    if (currencyFilter) {
+      filtered = filtered.filter(inv => inv.currency === currencyFilter);
+    }
+    
     // Apply creator filter
     filtered = filterInvoicesByCreator(filtered, creatorFilter, user?.id);
     
     // Apply sorting
     let sorted = sortInvoices(filtered, sortOption);
     return sorted;
-  }, [allInvoices, creatorFilter, sortOption, searchFilter, statusFilter, dateFromFilter, dateToFilter, user]);
+  }, [allInvoices, creatorFilter, sortOption, searchFilter, statusFilter, dateFromFilter, dateToFilter, currencyFilter, user]);
   
   const handleCreatorFilterChange = (filterValue) => {
     setCreatorFilter(filterValue);
@@ -155,6 +161,11 @@ const InvoiceList = () => {
 
   const handleSearchChange = (value) => {
     setSearchFilter(value);
+    setCurrentPage(1);
+  };
+  
+  const handleCurrencyChange = (value) => {
+    setCurrencyFilter(value === 'ALL' ? '' : value);
     setCurrentPage(1);
   };
   
@@ -251,6 +262,18 @@ const InvoiceList = () => {
       <div className="flex justify-between items-center mb-8">
         <h1 className="scroll-m-20 text-3xl font-semibold tracking-tight">Invoices</h1>
         <div className="flex items-center gap-3">
+          <Select value={currencyFilter || "ALL"} onValueChange={handleCurrencyChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All Currencies" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Currencies</SelectItem>
+              <SelectItem value="INR">INR (₹)</SelectItem>
+              <SelectItem value="USD">USD ($)</SelectItem>
+              <SelectItem value="EUR">EUR (€)</SelectItem>
+              <SelectItem value="GBP">GBP (£)</SelectItem>
+            </SelectContent>
+          </Select>
           <CreatorFilter 
             creators={creators}
             onFilterChange={handleCreatorFilterChange}
@@ -267,7 +290,7 @@ const InvoiceList = () => {
       {/* Filters */}
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <Input
                 type="text"
@@ -288,6 +311,21 @@ const InvoiceList = () => {
                   <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
                   <SelectItem value="APPROVED">Approved</SelectItem>
                   <SelectItem value="REJECTED">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Select value={currencyFilter || "ALL"} onValueChange={handleCurrencyChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Currencies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Currencies</SelectItem>
+                  <SelectItem value="INR">INR (₹)</SelectItem>
+                  <SelectItem value="USD">USD ($)</SelectItem>
+                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="GBP">GBP (£)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -364,7 +402,13 @@ const InvoiceList = () => {
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
                           <span className="text-lg font-bold font-mono tabular-nums">
-                            ₹{parseFloat(invoice.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {(() => {
+                              const getCurrencySymbol = (currency) => {
+                                const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                                return symbols[currency] || symbols['INR'];
+                              };
+                              return getCurrencySymbol(invoice.currency) + parseFloat(invoice.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                            })()}
                           </span>
                         </div>
                       </div>

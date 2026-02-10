@@ -39,7 +39,24 @@ exports.getChangedFields = (oldObj, newObj) => {
     
     // Format the field name (convert snake_case to readable)
     const fieldName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    changes.push(`${fieldName}: ${oldValue || 'empty'} → ${newValue || 'empty'}`);
+    
+    // Better formatting for different value types
+    let oldDisplay = oldValue;
+    let newDisplay = newValue;
+    
+    if (oldValue === null || oldValue === undefined || oldValue === '') {
+      oldDisplay = 'empty';
+    } else if (typeof oldValue === 'object') {
+      oldDisplay = Array.isArray(oldValue) ? `[${oldValue.length} items]` : '[object]';
+    }
+    
+    if (newValue === null || newValue === undefined || newValue === '') {
+      newDisplay = 'empty';
+    } else if (typeof newValue === 'object') {
+      newDisplay = Array.isArray(newValue) ? `[${newValue.length} items]` : '[object]';
+    }
+    
+    changes.push(`${fieldName}: ${oldDisplay} → ${newDisplay}`);
   }
   
   return changes.length > 0 ? changes : null;

@@ -18,7 +18,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Loader2, AlertTriangle, Package, Plus, Minus } from 'lucide-react';
 
 // Custom NumberInput component with stepper buttons
-const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, className, id, ...props }, ref) => {
+const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, className, id, name, ...props }, ref) => {
   const inputRef = useRef(null);
   
   // Use forwarded ref or internal ref
@@ -40,14 +40,14 @@ const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, clas
     const currentValue = parseFloat(value) || 0;
     const stepValue = parseFloat(step);
     const newValue = (currentValue + stepValue).toFixed(step.includes('.') ? step.split('.')[1].length : 0);
-    onChange({ target: { value: newValue } });
+    onChange({ target: { value: newValue, name: name } });
   };
 
   const decrement = () => {
     const currentValue = parseFloat(value) || 0;
     const stepValue = parseFloat(step);
     const newValue = Math.max(0, currentValue - stepValue).toFixed(step.includes('.') ? step.split('.')[1].length : 0);
-    onChange({ target: { value: newValue } });
+    onChange({ target: { value: newValue, name: name } });
   };
 
   return (
@@ -55,6 +55,7 @@ const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, clas
       <Input
         ref={actualRef}
         id={id}
+        name={name}
         type="number"
         step={step}
         value={value}
@@ -91,6 +92,17 @@ const NumberInput = forwardRef(({ value, onChange, step = "1", placeholder, clas
 });
 
 NumberInput.displayName = 'NumberInput';
+
+// Currency symbol helper
+const getCurrencySymbol = (currency) => {
+  const symbols = {
+    'INR': '₹',
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£'
+  };
+  return symbols[currency] || symbols['INR'];
+};
 
 const ReviewInvoiceDetail = () => {
   const { id } = useParams();
@@ -262,19 +274,33 @@ const ReviewInvoiceDetail = () => {
       return;
     }
 
-    const calculatedTotal = formData.items.reduce((sum, item) => {
-      const qty = parseFloat(item.quantity) || 0;
-      const price = parseFloat(item.unit_price) || 0;
-      return sum + (qty * price);
+    // Calculate: sum of line totals + tax - discount = total
+    const lineItemsTotal = formData.items.reduce((sum, item) => {
+      const lineTotal = parseFloat(item.line_total) || 0;
+      return sum + lineTotal;
     }, 0);
+    
+    const taxAmount = parseFloat(formData.tax_amount) || 0;
+    const discountAmount = parseFloat(formData.discount_amount) || 0;
+    const calculatedTotal = lineItemsTotal + taxAmount - discountAmount;
 
     const tolerance = 0.02; // 2 paisa tolerance
     const difference = Math.abs(calculatedTotal - totalAmount);
+    
+    const currencySymbol = getCurrencySymbol(formData.currency);
 
     if (difference > tolerance) {
       setFieldErrors(prev => ({
         ...prev,
-        'total_amount': `Invoice total (₹${totalAmount.toFixed(2)}) must match sum of line items (₹${calculatedTotal.toFixed(2)}). Please correct before submitting.`
+        'total_amount': `
+          Total amount mismatch: You entered ${currencySymbol}${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
+          but the calculation shows ${currencySymbol}${calculatedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          
+          Breakdown:
+          • Line Items Total: ${currencySymbol}${lineItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ${taxAmount > 0 ? `• Invoice Tax: +${currencySymbol}${taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+          ${discountAmount > 0 ? `• Discount: -${currencySymbol}${discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+        `.trim()
       }));
     } else {
       setFieldErrors(prev => {
@@ -284,7 +310,7 @@ const ReviewInvoiceDetail = () => {
         return newErrors;
       });
     }
-  }, [formData.total_amount, formData.items]);
+  }, [formData.total_amount, formData.items, formData.tax_amount, formData.discount_amount, formData.currency]);
 
   // Trigger search when phone or name changes (debounced)
   useEffect(() => {
@@ -303,12 +329,12 @@ const ReviewInvoiceDetail = () => {
     };
   }, [formData.customer_phone, formData.customer_name, searchCustomer]);
 
-  // Trigger total sum validation when total_amount or items change
+  // Trigger total sum validation when total_amount, items, tax_amount, discount_amount, or currency change
   useEffect(() => {
     if (formData.items.length > 0 && formData.total_amount) {
       checkTotalSum();
     }
-  }, [formData.total_amount, formData.items, checkTotalSum]);
+  }, [formData.total_amount, formData.items, formData.tax_amount, formData.discount_amount, formData.currency, checkTotalSum]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -402,11 +428,17 @@ const ReviewInvoiceDetail = () => {
       const newItems = [...prev.items];
       newItems[index] = { ...newItems[index], [field]: value };
       
-      // Auto-calculate line total
-      if (field === 'quantity' || field === 'unit_price') {
+      // Auto-calculate line total (including line-level tax)
+      if (field === 'quantity' || field === 'unit_price' || field === 'tax_percentage') {
         const qty = parseFloat(newItems[index].quantity) || 0;
         const price = parseFloat(newItems[index].unit_price) || 0;
-        newItems[index].line_total = (qty * price).toFixed(2);
+        const taxPct = parseFloat(newItems[index].tax_percentage) || 0;
+        
+        // Line total = (qty * price) + line tax
+        // Line tax = (qty * price) * (tax_percentage / 100)
+        const baseAmount = qty * price;
+        const lineTax = baseAmount * (taxPct / 100);
+        newItems[index].line_total = (baseAmount + lineTax).toFixed(2);
       }
       
       return { ...prev, items: newItems };
@@ -433,11 +465,15 @@ const ReviewInvoiceDetail = () => {
         product_id: product.id
       };
       
-      // Auto-calculate line total if quantity exists
+      // Auto-calculate line total if quantity exists (including line-level tax)
       const qty = parseFloat(newItems[index].quantity) || 0;
       const price = parseFloat(product.standard_price || newItems[index].unit_price) || 0;
+      const taxPct = parseFloat(newItems[index].tax_percentage) || 0;
+      
       if (qty > 0 && price > 0) {
-        newItems[index].line_total = (qty * price).toFixed(2);
+        const baseAmount = qty * price;
+        const lineTax = baseAmount * (taxPct / 100);
+        newItems[index].line_total = (baseAmount + lineTax).toFixed(2);
       }
       
       return { ...prev, items: newItems };
@@ -668,7 +704,15 @@ const ReviewInvoiceDetail = () => {
                      fieldName.includes('_') && fieldName.startsWith('customer') ? `customer.${fieldName.replace('customer_', '')}` :
                      `invoice.${fieldName}`;
     
-    setFieldErrors(prev => ({ ...prev, [errorKey]: error }));
+    setFieldErrors(prev => {
+      const updated = { ...prev };
+      if (error) {
+        updated[errorKey] = error;
+      } else {
+        delete updated[errorKey];  // Remove error when field is valid
+      }
+      return updated;
+    });
   };
 
   // Validate individual line item field on blur
@@ -700,7 +744,15 @@ const ReviewInvoiceDetail = () => {
     }
     
     const errorKey = `items[${index}].${fieldName}`;
-    setFieldErrors(prev => ({ ...prev, [errorKey]: error }));
+    setFieldErrors(prev => {
+      const updated = { ...prev };
+      if (error) {
+        updated[errorKey] = error;
+      } else {
+        delete updated[errorKey];  // Remove error when field is valid
+      }
+      return updated;
+    });
   };
 
   const handleSubmitForApproval = async () => {
@@ -1135,6 +1187,7 @@ const ReviewInvoiceDetail = () => {
                       <DatePicker
                         value={formData.invoice_date}
                         onChange={(date) => handleFieldChange('invoice_date', date)}
+                        onBlur={(date) => validateField('invoice_date', date)}
                         placeholder="Select invoice date"
                       />
                     </div>
@@ -1507,7 +1560,7 @@ const ReviewInvoiceDetail = () => {
                           </div>
                           <div className="col-span-2 md:col-span-5 pt-2 border-t">
                             <Label className="text-muted-foreground">
-                              Line Total: <span className="text-primary font-mono tracking-tighter">₹{item.line_total || '0.00'}</span>
+                              Line Total (incl. tax): <span className="text-primary font-mono tracking-tighter">{getCurrencySymbol(formData.currency)}{item.line_total || '0.00'}</span>
                             </Label>
                           </div>
                         </div>

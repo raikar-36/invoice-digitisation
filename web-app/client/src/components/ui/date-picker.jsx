@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled }) {
+export function DatePicker({ value, onChange, onBlur, placeholder = "Pick a date", disabled }) {
   const [date, setDate] = React.useState(value ? new Date(value) : undefined);
   const [inputValue, setInputValue] = React.useState('');
 
@@ -121,6 +121,10 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
     if (input && input.length > 0) {
       // Try to parse on blur even if input is short
       tryParseDate(input);
+    }
+    // Call parent's onBlur if provided
+    if (onBlur) {
+      onBlur(date ? format(date, 'yyyy-MM-dd') : '');
     }
   };
 

@@ -10,6 +10,7 @@ import { filterInvoicesByCreator, sortInvoices, getCreatorsFromInvoices } from '
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis } from '@/components/ui/pagination';
 import CreatorFilter from '@/components/CreatorFilter';
@@ -27,6 +28,7 @@ const ReviewInvoices = () => {
   
   // Client-side filters
   const [creatorFilter, setCreatorFilter] = useState('all');
+  const [currencyFilter, setCurrencyFilter] = useState('');
   const [sortOption, setSortOption] = useState(sessionStorage.getItem('sort_review') || 'created_desc');
 
   // Pagination
@@ -67,9 +69,15 @@ const ReviewInvoices = () => {
   // Apply client-side filtering and sorting
   const processedInvoices = useMemo(() => {
     let filtered = filterInvoicesByCreator(allInvoices, creatorFilter, user?.id);
+    
+    // Apply currency filter
+    if (currencyFilter) {
+      filtered = filtered.filter(inv => inv.currency === currencyFilter);
+    }
+    
     let sorted = sortInvoices(filtered, sortOption);
     return sorted;
-  }, [allInvoices, creatorFilter, sortOption, user]);
+  }, [allInvoices, creatorFilter, currencyFilter, sortOption, user]);
   
   const handleCreatorFilterChange = (filterValue) => {
     setCreatorFilter(filterValue);
@@ -79,6 +87,11 @@ const ReviewInvoices = () => {
   const handleSortChange = (sortValue) => {
     setSortOption(sortValue);
     setCurrentPage(1); // Reset to first page when sort changes
+  };
+  
+  const handleCurrencyChange = (value) => {
+    setCurrencyFilter(value === 'ALL' ? '' : value);
+    setCurrentPage(1);
   };
 
   const handleReviewClick = (invoiceId) => {
@@ -163,11 +176,25 @@ const ReviewInvoices = () => {
               Review and correct invoice data extracted by OCR before submitting for approval
             </p>
           </div>
-          <CreatorFilter 
-            creators={creators}
-            onFilterChange={handleCreatorFilterChange}
-            storageKey="filter_review_creator"
-          />
+          <div className="flex items-center gap-3">
+            <Select value={currencyFilter || "ALL"} onValueChange={handleCurrencyChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Currencies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Currencies</SelectItem>
+                <SelectItem value="INR">INR (₹)</SelectItem>
+                <SelectItem value="USD">USD ($)</SelectItem>
+                <SelectItem value="EUR">EUR (€)</SelectItem>
+                <SelectItem value="GBP">GBP (£)</SelectItem>
+              </SelectContent>
+            </Select>
+            <CreatorFilter 
+              creators={creators}
+              onFilterChange={handleCreatorFilterChange}
+              storageKey="filter_review_creator"
+            />
+          </div>
         </div>
       </div>
 
@@ -251,7 +278,13 @@ const ReviewInvoices = () => {
                               <span>Amount</span>
                             </div>
                             <p className="font-semibold font-mono tracking-tighter tabular-nums">
-                              ₹{invoice.total_amount?.toLocaleString() || '0.00'}
+                              {(() => {
+                                const getCurrencySymbol = (currency) => {
+                                  const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                                  return symbols[currency] || symbols['INR'];
+                                };
+                                return getCurrencySymbol(invoice.currency) + (invoice.total_amount?.toLocaleString() || '0.00');
+                              })()}
                             </p>
                           </div>
                           <div>

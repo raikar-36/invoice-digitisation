@@ -107,19 +107,33 @@ const validateInvoiceData = (data) => {
       }
     });
 
-    // Validate sum of line items equals total amount (BLOCKING ERROR)
+    // Validate total amount = sum of line totals + tax - discount (BLOCKING ERROR)
     if (data.total_amount !== undefined && data.total_amount !== null && !errors.total_amount) {
-      const calculatedTotal = data.items.reduce((sum, item) => {
-        const qty = parseFloat(item.quantity) || 0;
-        const price = parseFloat(item.unit_price) || 0;
-        return sum + (qty * price);
+      const lineItemsTotal = data.items.reduce((sum, item) => {
+        const lineTotal = parseFloat(item.line_total) || 0;
+        return sum + lineTotal;
       }, 0);
 
+      const taxAmount = parseFloat(data.tax_amount) || 0;
+      const discountAmount = parseFloat(data.discount_amount) || 0;
+      const calculatedTotal = lineItemsTotal + taxAmount - discountAmount;
       const totalAmount = parseFloat(data.total_amount) || 0;
       const tolerance = 0.02; // Allow 2 paisa tolerance for rounding differences
 
       if (Math.abs(calculatedTotal - totalAmount) > tolerance) {
-        errors.total_amount = `Invoice total (₹${totalAmount.toFixed(2)}) must match sum of line items (₹${calculatedTotal.toFixed(2)}). Please correct before submitting.`;
+        const getCurrencySymbol = (currency) => {
+          const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+          return symbols[currency] || currency;
+        };
+        const currencySymbol = getCurrencySymbol(data.currency || 'INR');
+        
+        const breakdown = [
+          `Line Items Total: ${currencySymbol}${lineItemsTotal.toFixed(2)}`,
+          taxAmount > 0 ? `Invoice Tax: +${currencySymbol}${taxAmount.toFixed(2)}` : '',
+          discountAmount > 0 ? `Discount: -${currencySymbol}${discountAmount.toFixed(2)}` : ''
+        ].filter(Boolean).join(', ');
+        
+        errors.total_amount = `Total amount mismatch: You entered ${currencySymbol}${totalAmount.toFixed(2)} but the calculation shows ${currencySymbol}${calculatedTotal.toFixed(2)}. Breakdown: ${breakdown}`;
       }
     }
   }
@@ -316,9 +330,15 @@ exports.uploadInvoice = async (req, res) => {
 
     console.log('========== UPLOAD COMPLETE ==========\n');
 
+    const getCurrencySymbol = (currency) => {
+      const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+      return symbols[currency] || currency;
+    };
+    const currencySymbol = getCurrencySymbol(normalized?.invoice?.currency || 'INR');
+
     res.status(201).json({
       success: true,
-      message: `Invoice uploaded successfully! OCR extracted: ${normalized?.invoice?.invoice_number || 'Unknown'} - ₹${normalized?.invoice?.total_amount?.toLocaleString('en-IN') || '0'}`,
+      message: `Invoice uploaded successfully! OCR extracted: ${normalized?.invoice?.invoice_number || 'Unknown'} - ${currencySymbol}${normalized?.invoice?.total_amount?.toLocaleString('en-IN') || '0'}`,
       invoiceId,
       ocrData: normalized
     });
@@ -341,7 +361,8 @@ exports.getInvoices = async (req, res) => {
     
     let query = `
       SELECT 
-        i.id, i.invoice_number, i.invoice_date, i.total_amount, 
+        i.id, i.invoice_number, i.invoice_date, i.total_amount, i.currency,
+        i.tax_amount, i.discount_amount,
         i.status, i.created_at, i.generated_pdf_document_id,
         i.submitted_at, i.rejection_reason, i.created_by,
         c.name as customer_name, c.phone as customer_phone,
@@ -387,6 +408,15 @@ exports.getInvoices = async (req, res) => {
           }
           if (ocrData.normalized_ocr_json.invoice?.total_amount !== undefined) {
             invoice.total_amount = ocrData.normalized_ocr_json.invoice.total_amount;
+          }
+          if (ocrData.normalized_ocr_json.invoice?.tax_amount !== undefined) {
+            invoice.tax_amount = ocrData.normalized_ocr_json.invoice.tax_amount;
+          }
+          if (ocrData.normalized_ocr_json.invoice?.discount_amount !== undefined) {
+            invoice.discount_amount = ocrData.normalized_ocr_json.invoice.discount_amount;
+          }
+          if (ocrData.normalized_ocr_json.invoice?.currency) {
+            invoice.currency = ocrData.normalized_ocr_json.invoice.currency;
           }
           if (ocrData.normalized_ocr_json.customer?.name) {
             invoice.customer_name = ocrData.normalized_ocr_json.customer.name;
@@ -722,9 +752,18 @@ exports.updateInvoice = async (req, res) => {
             invoice_number: invoice.invoice_number,
             invoice_date: invoice.invoice_date,
             total_amount: invoice.total_amount,
-            customer_name: invoice.customer_name
+            tax_amount: invoice.tax_amount,
+            discount_amount: invoice.discount_amount,
+            currency: invoice.currency
           },
-          updateData
+          {
+            invoice_number: updateData.invoice_number,
+            invoice_date: updateData.invoice_date,
+            total_amount: updateData.total_amount,
+            tax_amount: updateData.tax_amount,
+            discount_amount: updateData.discount_amount,
+            currency: updateData.currency
+          }
         )
       })
     });
@@ -1312,10 +1351,22 @@ exports.generatePdf = async (req, res) => {
       });
     }
 
+    // Get currency symbol helper
+    const getCurrencySymbol = (currency) => {
+      const symbols = {
+        'INR': '₹',
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£'
+      };
+      return symbols[currency] || currency;
+    };
+
     // Helper function for currency formatting
     const formatCurrency = (amount) => {
       const numAmount = parseFloat(amount || 0);
-      return 'Rs. ' + new Intl.NumberFormat('en-IN', {
+      const currencySymbol = getCurrencySymbol(invoice.currency || 'INR');
+      return currencySymbol + ' ' + new Intl.NumberFormat('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       }).format(numAmount);

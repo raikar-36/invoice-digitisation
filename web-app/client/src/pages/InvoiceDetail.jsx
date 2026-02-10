@@ -262,7 +262,15 @@ const InvoiceDetail = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Amount</p>
-                    <p className="font-semibold text-lg font-mono tabular-nums">₹{parseFloat(invoice.total_amount).toLocaleString('en-IN')}</p>
+                    <p className="font-semibold text-lg font-mono tabular-nums">
+                      {(() => {
+                        const getCurrencySymbol = (currency) => {
+                          const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                          return symbols[currency] || symbols['INR'];
+                        };
+                        return getCurrencySymbol(invoice.currency) + parseFloat(invoice.total_amount).toLocaleString('en-IN');
+                      })()}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Status</p>
@@ -334,9 +342,23 @@ const InvoiceDetail = () => {
                         <TableRow key={index}>
                           <TableCell>{item.product_name || item.description}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell className="text-right font-mono tabular-nums">₹{parseFloat(item.unit_price).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">
+                            {(() => {
+                              const getCurrencySymbol = (currency) => {
+                                const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                                return symbols[currency] || symbols['INR'];
+                              };
+                              return getCurrencySymbol(invoice.currency) + parseFloat(item.unit_price).toFixed(2);
+                            })()}
+                          </TableCell>
                           <TableCell className="text-right font-semibold font-mono tabular-nums">
-                            ₹{parseFloat(item.line_total).toFixed(2)}
+                            {(() => {
+                              const getCurrencySymbol = (currency) => {
+                                const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                                return symbols[currency] || symbols['INR'];
+                              };
+                              return getCurrencySymbol(invoice.currency) + parseFloat(item.line_total).toFixed(2);
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}

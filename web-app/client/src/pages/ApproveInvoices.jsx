@@ -11,6 +11,7 @@ import { filterInvoicesByCreator, sortInvoices, getCreatorsFromInvoices } from '
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -36,6 +37,7 @@ const ApproveInvoices = () => {
   
   // Client-side filters
   const [creatorFilter, setCreatorFilter] = useState('all');
+  const [currencyFilter, setCurrencyFilter] = useState('');
   const [sortOption, setSortOption] = useState(sessionStorage.getItem('sort_approval') || 'created_desc');
 
   // Fetch all invoices once on mount
@@ -72,9 +74,15 @@ const ApproveInvoices = () => {
   // Apply client-side filtering and sorting
   const processedInvoices = useMemo(() => {
     let filtered = filterInvoicesByCreator(allInvoices, creatorFilter, user?.id);
+    
+    // Apply currency filter
+    if (currencyFilter) {
+      filtered = filtered.filter(inv => inv.currency === currencyFilter);
+    }
+    
     let sorted = sortInvoices(filtered, sortOption);
     return sorted;
-  }, [allInvoices, creatorFilter, sortOption, user]);
+  }, [allInvoices, creatorFilter, currencyFilter, sortOption, user]);
   
   const handleCreatorFilterChange = (filterValue) => {
     setCreatorFilter(filterValue);
@@ -84,6 +92,11 @@ const ApproveInvoices = () => {
   const handleSortChange = (sortValue) => {
     setSortOption(sortValue);
     setCurrentPage(1); // Reset to first page when sort changes
+  };
+  
+  const handleCurrencyChange = (value) => {
+    setCurrencyFilter(value === 'ALL' ? '' : value);
+    setCurrentPage(1);
   };
 
   const handleApproveClick = (invoice) => {
@@ -208,11 +221,25 @@ const ApproveInvoices = () => {
               Review and approve invoices that have been submitted by staff
             </p>
           </div>
-          <CreatorFilter 
-            creators={creators}
-            onFilterChange={handleCreatorFilterChange}
-            storageKey="filter_approval_creator"
-          />
+          <div className="flex items-center gap-3">
+            <Select value={currencyFilter || "ALL"} onValueChange={handleCurrencyChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Currencies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Currencies</SelectItem>
+                <SelectItem value="INR">INR (₹)</SelectItem>
+                <SelectItem value="USD">USD ($)</SelectItem>
+                <SelectItem value="EUR">EUR (€)</SelectItem>
+                <SelectItem value="GBP">GBP (£)</SelectItem>
+              </SelectContent>
+            </Select>
+            <CreatorFilter 
+              creators={creators}
+              onFilterChange={handleCreatorFilterChange}
+              storageKey="filter_approval_creator"
+            />
+          </div>
         </div>
       </div>
 
@@ -300,13 +327,25 @@ const ApproveInvoices = () => {
                       <div>
                         <span className="text-muted-foreground">Amount:</span>
                         <p className="font-medium font-mono tabular-nums">
-                          ₹{invoice.total_amount?.toLocaleString()}
+                          {(() => {
+                            const getCurrencySymbol = (currency) => {
+                              const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                              return symbols[currency] || symbols['INR'];
+                            };
+                            return getCurrencySymbol(invoice.currency) + (invoice.total_amount?.toLocaleString() || '0');
+                          })()}
                         </p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Tax:</span>
                         <p className="font-medium font-mono tabular-nums">
-                          ₹{(invoice.tax_amount || 0).toLocaleString()}
+                          {(() => {
+                            const getCurrencySymbol = (currency) => {
+                              const symbols = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+                              return symbols[currency] || symbols['INR'];
+                            };
+                            return getCurrencySymbol(invoice.currency) + ((invoice.tax_amount || 0).toLocaleString());
+                          })()}
                         </p>
                       </div>
                       <div>
