@@ -6,6 +6,7 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Basic validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -13,10 +14,19 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+
     const pool = getPostgresPool();
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1 AND status = $2',
-      [email, 'ACTIVE']
+      [email.trim().toLowerCase(), 'ACTIVE']
     );
 
     if (result.rows.length === 0) {

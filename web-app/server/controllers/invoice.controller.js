@@ -8,29 +8,172 @@ const { normalizeDate } = require('../utils/dateNormalizer');
 const { invalidateAnalyticsCache } = require('../utils/cacheManager');
 const PDFDocument = require('pdfkit');
 
-// Validation helper
+// Comprehensive validation helper - returns both errors (blocking) and warnings (non-blocking)
 const validateInvoiceData = (data) => {
   const errors = {};
+  const warnings = {};
 
+  // Invoice Number validation
   if (!data.invoice_number || data.invoice_number.trim() === '') {
     errors.invoice_number = 'Invoice number is required';
+  } else if (data.invoice_number.length > 50) {
+    errors.invoice_number = 'Invoice number must be less than 50 characters';
   }
 
+  // Invoice Date validation
   if (!data.invoice_date) {
     errors.invoice_date = 'Invoice date is required';
+  } else {
+    const invoiceDate = new Date(data.invoice_date);
+    const today = new Date();
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
+    const oneYearAhead = new Date();
+    oneYearAhead.setFullYear(today.getFullYear() + 1);
+
+    if (invoiceDate < oneYearAgo) {
+      warnings.invoice_date = 'Invoice date is more than 1 year old. Please verify this is correct.';
+    } else if (invoiceDate > oneYearAhead) {
+      errors.invoice_date = 'Invoice date cannot be more than 1 year in the future';
+    }
   }
 
+  // Total Amount validation
+  if (data.total_amount !== undefined && data.total_amount !== null) {
+    const totalAmount = parseFloat(data.total_amount);
+    if (isNaN(totalAmount) || totalAmount <= 0) {
+      errors.total_amount = 'Total amount must be greater than 0';
+    } else if (totalAmount > 100000000) { // 10 crore limit
+      errors.total_amount = 'Total amount cannot exceed ₹10,00,00,000';
+    }
+  }
+
+  // Tax and Discount validation
+  if (data.tax_amount !== undefined && data.tax_amount !== null) {
+    const taxAmount = parseFloat(data.tax_amount);
+    if (isNaN(taxAmount) || taxAmount < 0) {
+      errors.tax_amount = 'Tax amount cannot be negative';
+    } else if (taxAmount > 10000000) {
+      errors.tax_amount = 'Tax amount seems unusually high';
+    }
+  }
+
+  if (data.discount_amount !== undefined && data.discount_amount !== null) {
+    const discountAmount = parseFloat(data.discount_amount);
+    if (isNaN(discountAmount) || discountAmount < 0) {
+      errors.discount_amount = 'Discount amount cannot be negative';
+    }
+  }
+
+  // Currency validation
+  if (data.currency && !['INR', 'USD', 'EUR', 'GBP'].includes(data.currency)) {
+    errors.currency = 'Invalid currency code';
+  }
+
+  // Line Items validation
   if (!data.items || data.items.length === 0) {
     errors.items = 'At least one line item is required';
+  } else if (data.items.length > 100) {
+    errors.items = 'Cannot have more than 100 line items';
   } else {
     data.items.forEach((item, index) => {
-      if (!item.quantity || item.quantity <= 0) {
-        errors[`items[${index}].quantity`] = 'Quantity must be greater than 0';
+      // Item description validation
+      if (!item.description || item.description.trim() === '') {
+        errors[`items[${index}].description`] = `Row ${index + 1}: Item description is required`;
+      } else if (item.description.length > 500) {
+        errors[`items[${index}].description`] = `Row ${index + 1}: Description too long (max 500 characters)`;
       }
-      if (!item.unit_price || item.unit_price <= 0) {
-        errors[`items[${index}].unit_price`] = 'Unit price must be greater than 0';
+
+      // Quantity validation
+      if (!item.quantity || parseFloat(item.quantity) <= 0) {
+        errors[`items[${index}].quantity`] = `Row ${index + 1}: Quantity must be greater than 0`;
+      } else if (parseFloat(item.quantity) > 1000000) {
+        errors[`items[${index}].quantity`] = `Row ${index + 1}: Quantity seems unusually high`;
+      }
+
+      // Unit Price validation
+      if (!item.unit_price || parseFloat(item.unit_price) <= 0) {
+        errors[`items[${index}].unit_price`] = `Row ${index + 1}: Unit price must be greater than 0`;
+      } else if (parseFloat(item.unit_price) > 10000000) {
+        errors[`items[${index}].unit_price`] = `Row ${index + 1}: Unit price seems unusually high`;
+      }
+
+      // Tax percentage validation
+      if (item.tax_percentage !== undefined && item.tax_percentage !== null) {
+        const taxPct = parseFloat(item.tax_percentage);
+        if (isNaN(taxPct) || taxPct < 0 || taxPct > 100) {
+          errors[`items[${index}].tax_percentage`] = `Row ${index + 1}: Tax percentage must be between 0 and 100`;
+        }
       }
     });
+
+    // Validate sum of line items equals total amount (BLOCKING ERROR)
+    if (data.total_amount !== undefined && data.total_amount !== null && !errors.total_amount) {
+      const calculatedTotal = data.items.reduce((sum, item) => {
+        const qty = parseFloat(item.quantity) || 0;
+        const price = parseFloat(item.unit_price) || 0;
+        return sum + (qty * price);
+      }, 0);
+
+      const totalAmount = parseFloat(data.total_amount) || 0;
+      const tolerance = 0.02; // Allow 2 paisa tolerance for rounding differences
+
+      if (Math.abs(calculatedTotal - totalAmount) > tolerance) {
+        errors.total_amount = `Invoice total (₹${totalAmount.toFixed(2)}) must match sum of line items (₹${calculatedTotal.toFixed(2)}). Please correct before submitting.`;
+      }
+    }
+  }
+
+  return {
+    errors: Object.keys(errors).length > 0 ? errors : null,
+    warnings: Object.keys(warnings).length > 0 ? warnings : null
+  };
+};
+
+// Customer data validation helper
+const validateCustomerData = (customerData) => {
+  const errors = {};
+
+  // Name validation
+  if (!customerData.name || customerData.name.trim() === '') {
+    errors['customer.name'] = 'Customer name is required';
+  } else if (customerData.name.length > 200) {
+    errors['customer.name'] = 'Customer name must be less than 200 characters';
+  }
+
+  // Phone validation
+  if (!customerData.phone || customerData.phone.trim() === '') {
+    errors['customer.phone'] = 'Customer phone is required';
+  } else {
+    const phone = customerData.phone.replace(/\D/g, ''); // Remove non-digits
+    if (phone.length < 10) {
+      errors['customer.phone'] = 'Phone number must be at least 10 digits';
+    } else if (phone.length > 15) {
+      errors['customer.phone'] = 'Phone number cannot exceed 15 digits';
+    }
+  }
+
+  // Email validation (optional but must be valid if provided)
+  if (customerData.email && customerData.email.trim() !== '') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerData.email)) {
+      errors['customer.email'] = 'Invalid email format';
+    } else if (customerData.email.length > 100) {
+      errors['customer.email'] = 'Email must be less than 100 characters';
+    }
+  }
+
+  // GSTIN validation (optional but must be valid if provided)
+  if (customerData.gstin && customerData.gstin.trim() !== '') {
+    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (!gstinRegex.test(customerData.gstin)) {
+      errors['customer.gstin'] = 'Invalid GSTIN format (e.g., 29ABCDE1234F1Z5)';
+    }
+  }
+
+  // Address validation
+  if (customerData.address && customerData.address.length > 500) {
+    errors['customer.address'] = 'Address must be less than 500 characters';
   }
 
   return Object.keys(errors).length > 0 ? errors : null;
@@ -613,27 +756,38 @@ exports.submitForApproval = async (req, res) => {
     const existingCustomerId = submissionData.existingCustomerId || null;
 
     // Validate invoice data
-    const validationErrors = validateInvoiceData({
+    const validation = validateInvoiceData({
       invoice_number: invoiceData.invoice_number,
       invoice_date: invoiceData.invoice_date,
+      total_amount: invoiceData.total_amount,
+      tax_amount: invoiceData.tax_amount,
+      discount_amount: invoiceData.discount_amount,
+      currency: invoiceData.currency,
       items: items
     });
     
-    if (validationErrors) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: validationErrors
-      });
-    }
-
     // Validate customer data
-    if (!customerData.name || !customerData.phone) {
+    const customerValidation = validateCustomerData(customerData);
+    
+    // Combine all errors
+    const allErrors = {
+      ...(validation.errors || {}),
+      ...(customerValidation || {})
+    };
+    
+    // Return errors (blocking) if any
+    if (Object.keys(allErrors).length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Customer name and phone are required'
+        message: 'Please complete all required fields before submitting.',
+        errors: allErrors,
+        warnings: validation.warnings // Include warnings with errors
       });
     }
+    
+    // If we have warnings but no errors, still continue but send warnings to frontend
+    // This allows the submission to proceed while showing the warning
+    const hasWarnings = validation.warnings && Object.keys(validation.warnings).length > 0;
 
     const pool = getPostgresPool();
 
@@ -722,7 +876,8 @@ exports.submitForApproval = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Invoice submitted for approval'
+      message: 'Invoice submitted for approval',
+      warnings: hasWarnings ? validation.warnings : null
     });
   } catch (error) {
     console.error('Submit for approval error:', error);
@@ -762,7 +917,7 @@ exports.approveInvoice = async (req, res) => {
 
     // Check invoice status
     const invoiceCheck = await pool.query(
-      'SELECT status FROM invoices WHERE id = $1',
+      'SELECT id, invoice_number, total_amount, status FROM invoices WHERE id = $1',
       [id]
     );
 
@@ -773,7 +928,9 @@ exports.approveInvoice = async (req, res) => {
       });
     }
 
-    if (invoiceCheck.rows[0].status !== 'PENDING_APPROVAL') {
+    const invoice = invoiceCheck.rows[0];
+
+    if (invoice.status !== 'PENDING_APPROVAL') {
       return res.status(400).json({
         success: false,
         message: 'Invoice is not pending approval'

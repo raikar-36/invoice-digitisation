@@ -113,6 +113,7 @@ const ReviewInvoiceDetail = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [warnings, setWarnings] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
 
   // Customer matching state
@@ -248,6 +249,43 @@ const ReviewInvoiceDetail = () => {
     }
   }, []);
 
+  // Check if sum of line items matches total amount
+  const checkTotalSum = useCallback(() => {
+    const totalAmount = parseFloat(formData.total_amount) || 0;
+    if (totalAmount <= 0 || formData.items.length === 0) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors['total_amount'];
+        delete newErrors['invoice.total_amount'];
+        return newErrors;
+      });
+      return;
+    }
+
+    const calculatedTotal = formData.items.reduce((sum, item) => {
+      const qty = parseFloat(item.quantity) || 0;
+      const price = parseFloat(item.unit_price) || 0;
+      return sum + (qty * price);
+    }, 0);
+
+    const tolerance = 0.02; // 2 paisa tolerance
+    const difference = Math.abs(calculatedTotal - totalAmount);
+
+    if (difference > tolerance) {
+      setFieldErrors(prev => ({
+        ...prev,
+        'total_amount': `Invoice total (₹${totalAmount.toFixed(2)}) must match sum of line items (₹${calculatedTotal.toFixed(2)}). Please correct before submitting.`
+      }));
+    } else {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors['total_amount'];
+        delete newErrors['invoice.total_amount'];
+        return newErrors;
+      });
+    }
+  }, [formData.total_amount, formData.items]);
+
   // Trigger search when phone or name changes (debounced)
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -265,9 +303,37 @@ const ReviewInvoiceDetail = () => {
     };
   }, [formData.customer_phone, formData.customer_name, searchCustomer]);
 
+  // Trigger total sum validation when total_amount or items change
+  useEffect(() => {
+    if (formData.items.length > 0 && formData.total_amount) {
+      checkTotalSum();
+    }
+  }, [formData.total_amount, formData.items, checkTotalSum]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let processedValue = value;
+    
+    // Auto-uppercase GSTIN
+    if (name === 'customer_gstin') {
+      processedValue = value.toUpperCase();
+    }
+    
+    // Phone number sanitization - allow only digits, spaces, +, -, ()
+    if (name === 'customer_phone') {
+      processedValue = value.replace(/[^0-9+\-\s()]/g, '');
+      // Limit to 15 characters
+      if (processedValue.length > 15) {
+        processedValue = processedValue.substring(0, 15);
+      }
+    }
+    
+    // Email validation - trim spaces
+    if (name === 'customer_email') {
+      processedValue = value.trim().toLowerCase();
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
     
     // Clear field error when user starts typing
     const errorKey = `invoice.${name}` in fieldErrors ? `invoice.${name}` : 
@@ -290,6 +356,11 @@ const ReviewInvoiceDetail = () => {
     const errorKey = `invoice.${fieldName}` in fieldErrors ? `invoice.${fieldName}` : fieldName;
     if (fieldErrors[errorKey]) {
       setFieldErrors(prev => ({ ...prev, [errorKey]: null }));
+    }
+    
+    // Check total sum when total_amount changes
+    if (fieldName === 'total_amount') {
+      setTimeout(() => checkTotalSum(), 100);
     }
   };
 
@@ -346,6 +417,9 @@ const ReviewInvoiceDetail = () => {
     if (fieldErrors[errorKey]) {
       setFieldErrors(prev => ({ ...prev, [errorKey]: null }));
     }
+    
+    // Check total sum after updating items
+    setTimeout(() => checkTotalSum(), 100);
   };
 
   // Feature 1: Handle product selection from autocomplete
@@ -368,6 +442,7 @@ const ReviewInvoiceDetail = () => {
       
       return { ...prev, items: newItems };
     });
+    setTimeout(() => checkTotalSum(), 100);
   };
 
   // Handle normal item description change (without product selection)
@@ -472,6 +547,7 @@ const ReviewInvoiceDetail = () => {
         line_total: ''
       }]
     }));
+    setTimeout(() => checkTotalSum(), 100);
   };
 
   const removeItem = (index) => {
@@ -479,6 +555,7 @@ const ReviewInvoiceDetail = () => {
       ...prev,
       items: prev.items.filter((_, i) => i !== index)
     }));
+    setTimeout(() => checkTotalSum(), 100);
   };
 
   const handleSaveDraft = async () => {
@@ -526,10 +603,111 @@ const ReviewInvoiceDetail = () => {
     }
   };
 
+  // Validate individual field on blur
+  const validateField = (fieldName, value) => {
+    let error = null;
+    
+    if (fieldName === 'invoice_number') {
+      if (!value || value.trim() === '') {
+        error = 'Invoice Number is required';
+      } else if (value.length > 50) {
+        error = 'Invoice number must be less than 50 characters';
+      }
+    } else if (fieldName === 'invoice_date') {
+      if (!value) {
+        error = 'Invoice Date is required';
+      }
+    } else if (fieldName === 'total_amount') {
+      if (!value) {
+        error = 'Total Amount is required';
+      } else {
+        const amount = parseFloat(value);
+        if (isNaN(amount) || amount <= 0) {
+          error = 'Total amount must be greater than 0';
+        } else if (amount > 100000000) {
+          error = 'Total amount cannot exceed ₹10,00,00,000';
+        }
+      }
+    } else if (fieldName === 'customer_name') {
+      if (!value || value.trim() === '') {
+        error = 'Customer Name is required';
+      } else if (value.length > 200) {
+        error = 'Customer name must be less than 200 characters';
+      }
+    } else if (fieldName === 'customer_phone') {
+      if (!value || value.trim() === '') {
+        error = 'Customer Phone is required';
+      } else {
+        const phone = value.replace(/\D/g, '');
+        if (phone.length < 10) {
+          error = 'Phone number must be at least 10 digits';
+        } else if (phone.length > 15) {
+          error = 'Phone number cannot exceed 15 digits';
+        }
+      }
+    } else if (fieldName === 'customer_email') {
+      if (value && value.trim() !== '') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) {
+          error = 'Invalid email format';
+        } else if (value.length > 100) {
+          error = 'Email must be less than 100 characters';
+        }
+      }
+    } else if (fieldName === 'customer_gstin') {
+      if (value && value.trim() !== '') {
+        const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!gstinRegex.test(value)) {
+          error = 'Invalid GSTIN format (e.g., 29ABCDE1234F1Z5)';
+        }
+      }
+    }
+    
+    const errorKey = fieldName.startsWith('invoice.') ? fieldName :
+                     fieldName.startsWith('customer.') ? fieldName :
+                     fieldName.includes('_') && fieldName.startsWith('customer') ? `customer.${fieldName.replace('customer_', '')}` :
+                     `invoice.${fieldName}`;
+    
+    setFieldErrors(prev => ({ ...prev, [errorKey]: error }));
+  };
+
+  // Validate individual line item field on blur
+  const validateItemField = (index, fieldName, value) => {
+    let error = null;
+    
+    if (fieldName === 'quantity') {
+      if (!value || value.trim() === '') {
+        error = `Row ${index + 1}: Quantity is required`;
+      } else {
+        const qty = parseFloat(value);
+        if (isNaN(qty) || qty <= 0) {
+          error = `Row ${index + 1}: Quantity must be greater than 0`;
+        } else if (qty > 1000000) {
+          error = `Row ${index + 1}: Quantity seems unusually high`;
+        }
+      }
+    } else if (fieldName === 'unit_price') {
+      if (!value || value.trim() === '') {
+        error = `Row ${index + 1}: Unit price is required`;
+      } else {
+        const price = parseFloat(value);
+        if (isNaN(price) || price <= 0) {
+          error = `Row ${index + 1}: Unit price must be greater than 0`;
+        } else if (price > 10000000) {
+          error = `Row ${index + 1}: Unit price seems unusually high`;
+        }
+      }
+    }
+    
+    const errorKey = `items[${index}].${fieldName}`;
+    setFieldErrors(prev => ({ ...prev, [errorKey]: error }));
+  };
+
   const handleSubmitForApproval = async () => {
     try {
       setSubmitting(true);
       setError('');
+      setWarnings([]);
       setFieldErrors({});
 
       // Validate required fields with specific messages
@@ -577,7 +755,7 @@ const ReviewInvoiceDetail = () => {
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
         const errorCount = Object.keys(errors).length;
-        setError(`Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} highlighted below`);
+        setError(`Please complete ${errorCount} required field${errorCount > 1 ? 's' : ''} marked below before submitting.`);
         
         // Auto-scroll to first error
         const firstErrorKey = Object.keys(errors)[0];
@@ -611,7 +789,7 @@ const ReviewInvoiceDetail = () => {
           total_amount: parseFloat(formData.total_amount),
           tax_amount: parseFloat(formData.tax_amount) || 0,
           discount_amount: parseFloat(formData.discount_amount) || 0,
-          currency: formData.currency
+          currency: formData.currency || 'INR'
         },
         customer: {
           name: formData.customer_name,
@@ -669,11 +847,17 @@ const ReviewInvoiceDetail = () => {
       // Check if we have validation errors
       if (err.response?.data?.errors) {
         const errors = err.response.data.errors;
+        const backendWarnings = err.response.data.warnings;
         setFieldErrors(errors);
         
         // Create a user-friendly error message
         const errorCount = Object.keys(errors).length;
-        setError(`Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} highlighted below`);
+        setError(`Please complete ${errorCount} required field${errorCount > 1 ? 's' : ''} marked below before submitting.`);
+        
+        // Show warnings visually if present
+        if (backendWarnings && Object.keys(backendWarnings).length > 0) {
+          setWarnings(Object.values(backendWarnings));
+        }
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
@@ -687,7 +871,12 @@ const ReviewInvoiceDetail = () => {
   const performSubmission = async (submissionData) => {
     try {
       setSubmitting(true);
-      await invoiceAPI.submit(id, submissionData);
+      const response = await invoiceAPI.submit(id, submissionData);
+      
+      // Check for warnings in success response
+      if (response.data.warnings && Object.keys(response.data.warnings).length > 0) {
+        setWarnings(Object.values(response.data.warnings));
+      }
       
       setSuccess('Invoice submitted for approval!');
       setTimeout(() => {
@@ -695,12 +884,20 @@ const ReviewInvoiceDetail = () => {
       }, 1500);
     } catch (err) {
       console.error('Submission error:', err);
+      console.error('Error response data:', err.response?.data);
       
       if (err.response?.data?.errors) {
         const errors = err.response.data.errors;
+        const backendWarnings = err.response.data.warnings;
+        console.error('Validation errors:', errors);
         setFieldErrors(errors);
         const errorCount = Object.keys(errors).length;
-        setError(`Please fix ${errorCount} validation error${errorCount > 1 ? 's' : ''} highlighted below`);
+        setError(`Please complete ${errorCount} required field${errorCount > 1 ? 's' : ''} marked below before submitting.`);
+        
+        // Show warnings visually if present
+        if (backendWarnings && Object.keys(backendWarnings).length > 0) {
+          setWarnings(Object.values(backendWarnings));
+        }
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
@@ -783,6 +980,19 @@ const ReviewInvoiceDetail = () => {
       {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {warnings.length > 0 && (
+        <Alert className="mb-6 bg-amber-50 text-amber-800 border-amber-300">
+          <AlertTriangle className="h-4 w-4 inline mr-2" />
+          <AlertDescription>
+            <div className="space-y-1">
+              {warnings.map((warning, index) => (
+                <div key={index}>{warning}</div>
+              ))}
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -904,8 +1114,11 @@ const ReviewInvoiceDetail = () => {
                       name="invoice_number"
                       value={formData.invoice_number}
                       onChange={handleInputChange}
+                      onBlur={(e) => validateField('invoice_number', e.target.value)}
                       className={`font-mono tracking-tighter ${fieldErrors['invoice.invoice_number'] ? 'border-destructive' : ''}`}
                       placeholder="INV-001"
+                      maxLength={50}
+                      required
                     />
                     {fieldErrors['invoice.invoice_number'] && (
                       <p className="text-destructive text-xs flex items-center gap-1">
@@ -943,13 +1156,17 @@ const ReviewInvoiceDetail = () => {
                       name="total_amount"
                       value={formData.total_amount}
                       onChange={handleInputChange}
-                      className={`font-mono tracking-tighter tabular-nums ${fieldErrors['invoice.total_amount'] ? 'border-destructive' : ''}`}
+                      onBlur={(e) => validateField('total_amount', e.target.value)}
+                      className={`font-mono tracking-tighter tabular-nums ${fieldErrors['invoice.total_amount'] || fieldErrors['total_amount'] ? 'border-destructive' : ''}`}
                       placeholder="0.00"
+                      min="0.01"
+                      max="100000000"
+                      required
                     />
-                    {fieldErrors['invoice.total_amount'] && (
+                    {(fieldErrors['invoice.total_amount'] || fieldErrors['total_amount']) && (
                       <p className="text-destructive text-xs flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
-                        {fieldErrors['invoice.total_amount']}
+                        {fieldErrors['invoice.total_amount'] || fieldErrors['total_amount']}
                       </p>
                     )}
                   </div>
@@ -961,9 +1178,17 @@ const ReviewInvoiceDetail = () => {
                       name="tax_amount"
                       value={formData.tax_amount}
                       onChange={handleInputChange}
-                      className="font-mono tracking-tighter tabular-nums"
+                      className={`font-mono tracking-tighter tabular-nums ${fieldErrors['tax_amount'] ? 'border-destructive' : ''}`}
                       placeholder="0.00"
+                      min="0"
+                      max="10000000"
                     />
+                    {fieldErrors['tax_amount'] && (
+                      <p className="text-destructive text-xs flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {fieldErrors['tax_amount']}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="discount_amount">Discount Amount</Label>
@@ -973,9 +1198,17 @@ const ReviewInvoiceDetail = () => {
                       name="discount_amount"
                       value={formData.discount_amount}
                       onChange={handleInputChange}
-                      className="font-mono tracking-tighter tabular-nums"
+                      className={`font-mono tracking-tighter tabular-nums ${fieldErrors['discount_amount'] ? 'border-destructive' : ''}`}
                       placeholder="0.00"
+                      min="0"
+                      max="10000000"
                     />
+                    {fieldErrors['discount_amount'] && (
+                      <p className="text-destructive text-xs flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {fieldErrors['discount_amount']}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Currency</Label>
@@ -987,6 +1220,7 @@ const ReviewInvoiceDetail = () => {
                         <SelectItem value="INR">INR (₹)</SelectItem>
                         <SelectItem value="USD">USD ($)</SelectItem>
                         <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1053,9 +1287,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleInputChange}
+                    onBlur={(e) => validateField('customer_name', e.target.value)}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
                     className={fieldErrors['customer.name'] ? 'border-destructive' : ''}
                     placeholder="ABC Traders"
+                    maxLength={200}
+                    required
                   />
                   {fieldErrors['customer.name'] && (
                     <p className="text-destructive text-xs flex items-center gap-1">
@@ -1075,9 +1312,12 @@ const ReviewInvoiceDetail = () => {
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleInputChange}
+                    onBlur={(e) => validateField('customer_phone', e.target.value)}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
                     className={fieldErrors['customer.phone'] ? 'border-destructive' : ''}
                     placeholder="+91-9876543210"
+                    maxLength={15}
+                    required
                   />
                   {fieldErrors['customer.phone'] && (
                     <p className="text-destructive text-xs flex items-center gap-1">
@@ -1094,9 +1334,17 @@ const ReviewInvoiceDetail = () => {
                     name="customer_email"
                     value={formData.customer_email}
                     onChange={handleInputChange}
+                    onBlur={(e) => validateField('customer_email', e.target.value)}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
                     placeholder="customer@example.com"
+                    maxLength={100}
                   />
+                  {fieldErrors['customer.email'] && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {fieldErrors['customer.email']}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="customer_gstin">GSTIN</Label>
@@ -1106,9 +1354,18 @@ const ReviewInvoiceDetail = () => {
                     name="customer_gstin"
                     value={formData.customer_gstin}
                     onChange={handleInputChange}
+                    onBlur={(e) => validateField('customer_gstin', e.target.value)}
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
                     placeholder="22AAAAA0000A1Z5"
+                    maxLength={15}
+                    style={{ textTransform: 'uppercase' }}
                   />
+                  {fieldErrors['customer.gstin'] && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {fieldErrors['customer.gstin']}
+                    </p>
+                  )}
                 </div>
                 <div className="col-span-2 space-y-2">
                   <Label htmlFor="customer_address">Address</Label>
@@ -1120,7 +1377,14 @@ const ReviewInvoiceDetail = () => {
                     disabled={matchType === 'exact' && customerSelection === 'existing'}
                     rows={2}
                     placeholder="123 Main St, City, State, ZIP"
+                    maxLength={500}
                   />
+                  {fieldErrors['customer.address'] && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {fieldErrors['customer.address']}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1187,8 +1451,12 @@ const ReviewInvoiceDetail = () => {
                               step="1"
                               value={item.quantity}
                               onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                              onBlur={(e) => validateItemField(index, 'quantity', e.target.value)}
                               className={fieldErrors[`items[${index}].quantity`] ? 'border-destructive' : ''}
                               placeholder="1"
+                              min="0.01"
+                              max="1000000"
+                              required
                             />
                             {fieldErrors[`items[${index}].quantity`] && (
                               <p className="text-destructive text-xs flex items-center gap-1">
@@ -1201,11 +1469,15 @@ const ReviewInvoiceDetail = () => {
                             <Label htmlFor={`item_unit_price_${index}`}>Unit Price</Label>
                             <NumberInput
                               id={`item_unit_price_${index}`}
-                              step="1"
+                              step="0.01"
                               value={item.unit_price}
                               onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                              onBlur={(e) => validateItemField(index, 'unit_price', e.target.value)}
                               className={`font-mono tracking-tighter ${fieldErrors[`items[${index}].unit_price`] ? 'border-destructive' : ''}`}
                               placeholder="0.00"
+                              min="0.01"
+                              max="10000000"
+                              required
                             />
                             {fieldErrors[`items[${index}].unit_price`] && (
                               <p className="text-destructive text-xs flex items-center gap-1">
@@ -1223,6 +1495,8 @@ const ReviewInvoiceDetail = () => {
                               onChange={(e) => handleItemChange(index, 'tax_percentage', e.target.value)}
                               className={fieldErrors[`items[${index}].tax_percentage`] ? 'border-destructive' : ''}
                               placeholder="0"
+                              min="0"
+                              max="100"
                             />
                             {fieldErrors[`items[${index}].tax_percentage`] && (
                               <p className="text-destructive text-xs flex items-center gap-1">

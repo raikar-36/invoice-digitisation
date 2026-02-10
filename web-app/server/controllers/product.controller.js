@@ -206,11 +206,43 @@ exports.createProduct = async (req, res) => {
     const { name, standard_price } = req.body;
     const pool = getPostgresPool();
 
+    // Product name validation
     if (!name || name.trim().length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Product name is required'
       });
+    }
+
+    if (name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product name must be at least 2 characters'
+      });
+    }
+
+    if (name.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product name must be less than 200 characters'
+      });
+    }
+
+    // Standard price validation
+    if (standard_price !== undefined && standard_price !== null) {
+      const price = parseFloat(standard_price);
+      if (isNaN(price) || price < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Standard price must be a positive number'
+        });
+      }
+      if (price > 10000000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Standard price cannot exceed ₹1,00,00,000'
+        });
+      }
     }
 
     const result = await pool.query(

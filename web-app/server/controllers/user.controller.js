@@ -3,11 +3,54 @@ const { getPostgresPool } = require('../config/database');
 const auditService = require('../services/audit.service');
 const auditHelper = require('../utils/auditHelper');
 
+// User validation helper
+const validateUserData = (name, email, password) => {
+  const errors = {};
+
+  // Name validation
+  if (!name || name.trim() === '') {
+    errors.name = 'Name is required';
+  } else if (name.length < 2) {
+    errors.name = 'Name must be at least 2 characters';
+  } else if (name.length > 100) {
+    errors.name = 'Name must be less than 100 characters';
+  }
+
+  // Email validation
+  if (!email || email.trim() === '') {
+    errors.email = 'Email is required';
+  } else {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      errors.email = 'Invalid email format';
+    } else if (email.length > 100) {
+      errors.email = 'Email must be less than 100 characters';
+    }
+  }
+
+  // Password validation
+  if (!password || password.trim() === '') {
+    errors.password = 'Password is required';
+  } else if (password.length < 8) {
+    errors.password = 'Password must be at least 8 characters';
+  } else if (password.length > 128) {
+    errors.password = 'Password must be less than 128 characters';
+  } else if (!/[A-Z]/.test(password)) {
+    errors.password = 'Password must contain at least one uppercase letter';
+  } else if (!/[a-z]/.test(password)) {
+    errors.password = 'Password must contain at least one lowercase letter';
+  } else if (!/[0-9]/.test(password)) {
+    errors.password = 'Password must contain at least one number';
+  }
+
+  return Object.keys(errors).length > 0 ? errors : null;
+};
+
 exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validation
+    // Basic validation
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
@@ -15,6 +58,17 @@ exports.createUser = async (req, res) => {
       });
     }
 
+    // Detailed validation
+    const validationErrors = validateUserData(name.trim(), email.trim().toLowerCase(), password);
+    if (validationErrors) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please complete all required fields correctly.',
+        errors: validationErrors
+      });
+    }
+
+    // Role validation
     if (!['STAFF', 'ACCOUNTANT'].includes(role)) {
       return res.status(400).json({
         success: false,
@@ -27,7 +81,7 @@ exports.createUser = async (req, res) => {
     // Check if email already exists
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',
-      [email]
+      [email.trim().toLowerCase()]
     );
 
     if (existingUser.rows.length > 0) {
@@ -45,7 +99,7 @@ exports.createUser = async (req, res) => {
       `INSERT INTO users (name, email, password_hash, role, status)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, name, email, role, status, created_at`,
-      [name, email, passwordHash, role, 'ACTIVE']
+      [name.trim(), email.trim().toLowerCase(), passwordHash, role, 'ACTIVE']
     );
 
     const newUser = result.rows[0];

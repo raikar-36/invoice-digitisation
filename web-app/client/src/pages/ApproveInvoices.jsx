@@ -11,7 +11,7 @@ import { filterInvoicesByCreator, sortInvoices, getCreatorsFromInvoices } from '
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext, PaginationEllipsis } from '@/components/ui/pagination';
@@ -442,6 +442,9 @@ const ApproveInvoices = () => {
         <DialogContent onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Reject Invoice</DialogTitle>
+            <DialogDescription>
+              Provide a reason for rejecting this invoice.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">

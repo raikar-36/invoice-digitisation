@@ -62,7 +62,7 @@ const Login = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="space-y-6">
               {error && (
                 <motion.div
                   initial={{ opacity: 0, x: -10 }}
@@ -80,8 +80,10 @@ const Login = () => {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value.toLowerCase())}
                   placeholder="your@email.com"
+                  maxLength={100}
+                  pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
                   required
                 />
               </div>
@@ -95,6 +97,8 @@ const Login = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    minLength={8}
+                    maxLength={128}
                     required
                     className="pr-10"
                   />

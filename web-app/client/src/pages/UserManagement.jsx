@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,6 +30,7 @@ const UserManagement = () => {
   const [creating, setCreating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [reactivating, setReactivating] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -54,19 +55,72 @@ const UserManagement = () => {
     }
   };
 
+  // Validate individual field on blur
+  const validateField = (fieldName, value) => {
+    let error = null;
+    
+    if (fieldName === 'name') {
+      if (!value || value.trim().length < 2) {
+        error = 'Name must be at least 2 characters';
+      }
+    } else if (fieldName === 'email') {
+      if (!value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        error = 'Invalid email format';
+      }
+    } else if (fieldName === 'password') {
+      if (!value || value.length < 8) {
+        error = 'Password must be at least 8 characters';
+      } else if (!/[A-Z]/.test(value)) {
+        error = 'Password must contain at least one uppercase letter';
+      } else if (!/[a-z]/.test(value)) {
+        error = 'Password must contain at least one lowercase letter';
+      } else if (!/[0-9]/.test(value)) {
+        error = 'Password must contain at least one number';
+      }
+    }
+    
+    setValidationErrors(prev => ({ ...prev, [fieldName]: error }));
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    
+    // Clear previous errors
+    setValidationErrors({});
+    
+    // Client-side validation
+    const errors = {};
+    if (!formData.name || formData.name.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters';
+    }
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Invalid email format';
+    }
+    if (!formData.password || formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
     try {
       setCreating(true);
       await userAPI.create(formData);
       setShowCreateModal(false);
       setFormData({ name: '', email: '', password: '', role: 'STAFF' });
+      setValidationErrors({});
       setShowPassword(false);
       loadUsers();
       showToast.success('User created successfully!');
     } catch (error) {
       console.error('Failed to create user:', error);
-      showToast.error(error.response?.data?.message || 'Failed to create user');
+      if (error.response?.data?.errors) {
+        setValidationErrors(error.response.data.errors);
+      } else {
+        showToast.error(error.response?.data?.message || 'Failed to create user');
+      }
     } finally {
       setCreating(false);
     }
@@ -227,38 +281,76 @@ const UserManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>
+              Add a new user to the system with their details and assigned role.
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateUser} className="space-y-4">
+          <form onSubmit={handleCreateUser} noValidate className="space-y-4">
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Name <span className="text-destructive">*</span></Label>
               <Input
                 id="name"
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  setValidationErrors({ ...validationErrors, name: null });
+                }}
+                onBlur={(e) => validateField('name', e.target.value)}
+                className={validationErrors.name ? 'border-destructive' : ''}
+                minLength={2}
+                maxLength={100}
                 required
+                placeholder="John Doe"
               />
+              {validationErrors.name && (
+                <p className="text-destructive text-xs mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {validationErrors.name}
+                </p>
+              )}
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value.toLowerCase() });
+                  setValidationErrors({ ...validationErrors, email: null });
+                }}
+                onBlur={(e) => validateField('email', e.target.value)}
+                className={validationErrors.email ? 'border-destructive' : ''}
+                maxLength={100}
+                pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
                 required
+                placeholder="user@example.com"
               />
+              {validationErrors.email && (
+                <p className="text-destructive text-xs mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {validationErrors.email}
+                </p>
+              )}
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    setValidationErrors({ ...validationErrors, password: null });
+                  }}
+                  onBlur={(e) => validateField('password', e.target.value)}
+                  className={`pr-10 ${validationErrors.password ? 'border-destructive' : ''}`}
+                  minLength={8}
+                  maxLength={128}
                   required
-                  className="pr-10"
+                  placeholder="Min 8 characters, 1 uppercase, 1 number"
                 />
                 <button
                   type="button"
@@ -272,6 +364,15 @@ const UserManagement = () => {
                   )}
                 </button>
               </div>
+              {validationErrors.password && (
+                <p className="text-destructive text-xs mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {validationErrors.password}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Must be at least 8 characters with uppercase, lowercase, and number
+              </p>
             </div>
             <div>
               <Label htmlFor="role">Role</Label>
